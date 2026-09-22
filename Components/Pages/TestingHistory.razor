@@ -1,0 +1,49 @@
+@page "/testing/history"
+@rendermode InteractiveServer
+@using ServicePortal.Data
+@using ServicePortal.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize(Policy = "TestingModule")]
+@inject TestingService TestingService
+
+<PageTitle>Previous Months Testing</PageTitle>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div><h1 class="mb-1">Previous Months</h1><p class="text-muted mb-0">Review completed and historical testing schedules.</p></div>
+    <input type="month" class="form-control" style="width: 180px;" value="@selectedMonthText" max="@DateTime.Today.ToString("yyyy-MM")" @onchange="MonthChangedAsync" />
+</div>
+<ul class="nav nav-pills mb-4"><li class="nav-item"><NavLink class="nav-link" href="testing" Match="NavLinkMatch.All">Current Testing</NavLink></li><li class="nav-item"><NavLink class="nav-link" href="testing/history">Previous Months</NavLink></li></ul>
+@if (message is not null) { <div class="alert @messageClass">@message</div> }
+@if (windows.Count > 0)
+{
+    <div class="card mb-4"><div class="card-header"><strong>Past live releases</strong></div><div class="list-group list-group-flush">@foreach (var window in windows) { <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center text-start" @onclick="() => OpenWindowAsync(window)"><span><strong>@window.Product</strong> · Release @window.ReleaseNumber</span><span class="text-muted">Live @window.LiveDate?.ToString("dd/MM/yyyy") <i class="bi bi-arrow-right ms-2"></i></span></button> }</div></div>
+}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><strong>@SelectedMonth.ToString("MMMM yyyy") results</strong><div class="btn-group">@foreach (var product in Products) { <button class="btn @(selectedProduct == product ? "btn-primary" : "btn-outline-primary")" @onclick="() => selectedProduct = product">@product</button> }</div></div>
+    @if (FilteredRuns.Count == 0) { <div class="card-body p-4 text-center text-muted">No testing records were found for this month.</div> }
+    else { <div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Release</th><th>Date</th><th>Software</th><th>Test case</th><th>Status</th><th>Tested by</th><th>Completed</th><th>Notes</th></tr></thead><tbody>@foreach (var run in FilteredRuns) { <tr class="@RowClass(run.Status)"><td><button class="btn btn-link fw-semibold p-0" @onclick="() => OpenRunWindowAsync(run)">@run.ReleaseNumber</button></td><td>@run.ScheduledDate.ToString("dd/MM/yyyy")</td><td><strong>@run.Product</strong><div class="small text-muted">@run.Scope</div></td><td>@run.TestCaseName</td><td><span class="badge @StatusClass(run.Status)">@run.Status</span></td><td>@(string.IsNullOrWhiteSpace(run.TestedBy) ? "Not assigned" : run.TestedBy)</td><td>@(run.CompletedAt?.ToString("dd/MM/yyyy") ?? "—")</td><td>@run.Notes</td></tr> }</tbody></table></div> }
+</div>
+
+@if (selectedWindow is not null)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h2 class="modal-title fs-5">@selectedWindow.Product · Release @selectedWindow.ReleaseNumber</h2><div class="small text-muted">Live @selectedWindow.LiveDate?.ToString("dd/MM/yyyy")</div></div><button type="button" class="btn-close" @onclick="CloseWindow"></button></div><div class="modal-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Point / test</th><th>Status</th><th>Tester</th><th>Second tester</th><th>Notes</th></tr></thead><tbody>@foreach (var run in selectedWindowRuns) { @if (IsRegression(run)) { <tr class="table-primary"><td colspan="5"><strong>@run.TestCaseName</strong></td></tr>@foreach (var test in TestingService.GetRegressionTests(run)) { <tr><td><strong>@test.TestCaseName</strong><div class="small text-muted">@test.Scope</div></td><td><span class="badge @StatusClass(test.Status)">@test.Status</span></td><td>@(string.IsNullOrWhiteSpace(test.TestedBy) ? "Not assigned" : test.TestedBy)</td><td>@(string.IsNullOrWhiteSpace(test.SecondTestedBy) ? "Not assigned" : test.SecondTestedBy)</td><td>@test.Notes</td></tr> } } else { <tr class="@RowClass(run.Status)"><td><strong>@run.TestCaseName</strong><div class="small text-muted">@run.Scope</div></td><td><span class="badge @StatusClass(run.Status)">@run.Status</span></td><td>@(string.IsNullOrWhiteSpace(run.TestedBy) ? "Not assigned" : run.TestedBy)</td><td>@(string.IsNullOrWhiteSpace(run.SecondTestedBy) ? "Not assigned" : run.SecondTestedBy)</td><td>@run.Notes</td></tr> } }</tbody></table></div></div><div class="modal-footer"><AuthorizeView Roles="Administrator"><Authorized>@if (confirmDelete) { <span class="text-danger small me-2">This permanently removes the release and all its test points.</span><button class="btn btn-danger" @onclick="DeleteSelectedWindowAsync"><i class="bi bi-trash me-1"></i>Confirm delete</button> } else { <button class="btn btn-outline-danger" @onclick="() => confirmDelete = true"><i class="bi bi-trash me-1"></i>Delete release</button> }</Authorized></AuthorizeView><button class="btn btn-outline-secondary" @onclick="CloseWindow">Close</button></div></div></div></div>
+}
+
+@code {
+    private static readonly string[] Products = ["All", "eCERT", "eGTA", "Brokerage Portal"];
+    private List<TestRun> runs = new(); private List<TestingWindow> windows = new(); private List<TestRun> selectedWindowRuns = new(); private TestingWindow? selectedWindow; private string selectedMonthText = DateTime.Today.AddMonths(-1).ToString("yyyy-MM"); private string selectedProduct = "All"; private bool confirmDelete; private string? message; private string messageClass = "alert-success";
+    private DateTime SelectedMonth => DateTime.TryParse(selectedMonthText + "-01", out var month) ? new(month.Year, month.Month, 1) : DateTime.Today.AddMonths(-1);
+    private List<TestRun> FilteredRuns => selectedProduct == "All" ? runs : runs.Where(run => run.Product == selectedProduct).ToList();
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private async Task MonthChangedAsync(ChangeEventArgs e) { selectedMonthText = e.Value?.ToString() ?? selectedMonthText; await LoadAsync(); }
+    private async Task LoadAsync() { runs = await TestingService.GetRunsAsync(SelectedMonth); windows = await TestingService.GetWindowsAsync(true); }
+    private async Task OpenWindowAsync(TestingWindow window) { selectedWindow = window; confirmDelete = false; selectedWindowRuns = (await TestingService.GetRunsAsync(window.Month)).Where(run => run.Product == window.Product && run.ReleaseNumber == window.ReleaseNumber).ToList(); }
+    private async Task OpenRunWindowAsync(TestRun run) => await OpenWindowAsync(new TestingWindow(run.Product, run.ReleaseNumber, new DateTime(run.ScheduledDate.Year, run.ScheduledDate.Month, 1), run.ReleaseStatus, run.ReleaseLiveDate, 0));
+    private void CloseWindow() { selectedWindow = null; selectedWindowRuns = new(); confirmDelete = false; }
+    private async Task DeleteSelectedWindowAsync() { if (selectedWindow is null) return; var window = selectedWindow; if (await TestingService.DeleteReleaseWindowAsync(window.Product, window.ReleaseNumber, window.Month)) { CloseWindow(); await LoadAsync(); message = "Release " + window.ReleaseNumber + " was deleted."; messageClass = "alert-success"; } else { message = "That release is no longer available."; messageClass = "alert-warning"; CloseWindow(); } }
+    private static bool IsRegression(TestRun run) => !string.IsNullOrWhiteSpace(run.RegressionTestsJson);
+    private static string StatusClass(string status) => status switch { "Pass" => "bg-success", "Fail" => "bg-danger", "In Progress" => "bg-primary", _ => "bg-secondary" };
+    private static string RowClass(string status) => status switch { "Pass" => "table-success", "Fail" => "table-danger", "In Progress" => "table-warning", _ => string.Empty };
+}
+

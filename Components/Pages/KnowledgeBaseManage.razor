@@ -1,0 +1,117 @@
+@page "/knowledge-base/manage"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using ServicePortal.Data
+@using ServicePortal.Services
+@attribute [Authorize(Policy = "SupportOrAdministrator")]
+@inject KnowledgeBaseService KnowledgeBaseService
+
+<PageHeader Title="Manage Knowledge Base" Description="Create, publish, update, archive, or import support articles.">
+    <Actions><a class="btn btn-outline-primary" href="knowledge-base">View Knowledge Base</a></Actions>
+</PageHeader>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert alert-success">@message</div>
+}
+
+<div class="card mb-4">
+    <div class="card-header"><strong><i class="bi bi-upload me-2"></i>Import articles</strong></div>
+    <div class="card-body">
+        <p class="text-muted mb-3">Choose an Axosoft or JIRA CSV/Excel export. Imported records become published articles and can be edited or deleted afterwards.</p>
+        <InputFile class="form-control" accept=".csv,.xlsx" OnChange="ImportAsync" />
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-7">
+        <div class="card">
+            <div class="card-header"><strong>@(model.Id == 0 ? "New article" : "Edit article")</strong></div>
+            <div class="card-body">
+                <EditForm Model="model" OnValidSubmit="SaveAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Category</label><InputSelect class="form-select" @bind-Value="model.CategoryId">@foreach (var category in categories) { <option value="@category.Id">@category.Name</option> }</InputSelect></div>
+                        <div class="col-md-6"><label class="form-label">Software</label><InputSelect class="form-select" @bind-Value="model.Software"><option value="">Not software-specific</option>@foreach (var software in SoftwareOptions) { <option>@software</option> }</InputSelect></div>
+                        <div class="col-md-6"><label class="form-label">Subcategory</label><InputSelect class="form-select" @bind-Value="model.Subcategory"><option value="">None</option>@foreach (var option in Subcategories) { <option>@option</option> }</InputSelect></div>
+                        <div class="col-md-6"><label class="form-label">Title</label><InputText class="form-control" @bind-Value="model.Title" /></div>
+                        <div class="col-12"><label class="form-label">Summary</label><InputText class="form-control" @bind-Value="model.Summary" /></div>
+                        <div class="col-12"><label class="form-label">Symptoms</label><InputTextArea class="form-control" rows="3" @bind-Value="model.Symptoms" /></div>
+                        <div class="col-12"><label class="form-label">Resolution</label><InputTextArea class="form-control" rows="6" @bind-Value="model.Resolution" /></div>
+                        <div class="col-12"><label class="form-label">Additional information</label><InputTextArea class="form-control" rows="3" @bind-Value="model.AdditionalInformation" /></div>
+                        <div class="col-12"><label class="form-label">Tags</label><InputText class="form-control" @bind-Value="model.Tags" placeholder="Your own tags, separated by commas" /></div>
+                        <div class="col-md-6 form-check ms-2"><InputCheckbox class="form-check-input" @bind-Value="model.IsPublished" /><label class="form-check-label">Published</label></div>
+                        <div class="col-md-6 form-check"><InputCheckbox class="form-check-input" @bind-Value="model.IsArchived" /><label class="form-check-label">Archived</label></div>
+                    </div>
+                    <div class="mt-4"><button class="btn btn-primary" type="submit">Save article</button><button class="btn btn-outline-secondary ms-2" type="button" @onclick="NewArticle">Cancel</button></div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card">
+            <div class="card-header"><strong>Articles</strong></div>
+            <div class="list-group list-group-flush">
+                @foreach (var article in articles)
+                {
+                    <div class="list-group-item d-flex justify-content-between gap-2"><button type="button" class="btn btn-link text-start p-0 text-decoration-none" @onclick="() => Edit(article)"><strong>@article.Title</strong><div class="small text-muted">@article.Software @article.Subcategory</div></button><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(article.Id)"><i class="bi bi-trash"></i></button></div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<KnowledgeBaseCategory> categories = [];
+    private List<KnowledgeBaseSoftwareOption> softwareOptions = [];
+    private List<KnowledgeArticle> articles = [];
+    private KnowledgeArticle model = new();
+    private string message = string.Empty;
+
+    private IEnumerable<string> SoftwareOptions => softwareOptions.Select(item => item.Software).Where(item => !string.IsNullOrWhiteSpace(item)).Distinct().Order();
+    private IEnumerable<string> Subcategories => softwareOptions.Where(item => item.Software == model.Software && !string.IsNullOrWhiteSpace(item.Subcategory)).Select(item => item.Subcategory).Distinct().Order();
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await KnowledgeBaseService.GetCategoriesAsync();
+        softwareOptions = await KnowledgeBaseService.GetSoftwareOptionsAsync();
+        NewArticle();
+        await LoadAsync();
+    }
+
+    private void NewArticle() => model = new KnowledgeArticle { CategoryId = categories.FirstOrDefault()?.Id ?? 0, IsPublished = true };
+    private async Task LoadAsync() => articles = await KnowledgeBaseService.GetArticlesAsync(true);
+    private void Edit(KnowledgeArticle article) => model = new KnowledgeArticle { Id = article.Id, CategoryId = article.CategoryId, Title = article.Title, Summary = article.Summary, Symptoms = article.Symptoms, Resolution = article.Resolution, AdditionalInformation = article.AdditionalInformation, Tags = article.Tags, Software = article.Software, Subcategory = article.Subcategory, IsPublished = article.IsPublished, IsArchived = article.IsArchived };
+
+    private async Task SaveAsync()
+    {
+        await KnowledgeBaseService.SaveArticleAsync(model);
+        message = "Article saved.";
+        NewArticle();
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        await KnowledgeBaseService.DeleteArticleAsync(id);
+        if (model.Id == id) NewArticle();
+        await LoadAsync();
+        message = "Article deleted.";
+    }
+
+    private async Task ImportAsync(InputFileChangeEventArgs file)
+    {
+        try
+        {
+            await using var stream = file.File.OpenReadStream(10 * 1024 * 1024);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            var count = await KnowledgeBaseService.ImportLogAsync(file.File.Name, memory.ToArray());
+            await LoadAsync();
+            message = $"{count} article(s) imported and published.";
+        }
+        catch (Exception ex) { message = ex.Message; }
+    }
+}

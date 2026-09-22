@@ -1,0 +1,250 @@
+@page "/reports"
+@rendermode InteractiveServer
+
+@using ServicePortal.Data
+@using ServicePortal.Models
+@using ServicePortal.Services
+@using ServicePortal.Components.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+
+@attribute [Authorize]
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationService AuthorizationService
+@inject TicketService TicketService
+@inject OnboardingService OnboardingService
+@inject TestingService TestingService
+@inject NavigationManager Navigation
+
+<PageHeader Title="Reports" Description="A clear summary of the modules available to you." />
+
+@if (!isLoaded)
+{
+    <div class="card"><div class="card-body text-muted">Loading your reports...</div></div>
+}
+else if (enabledModuleCount == 0)
+{
+    <div class="card"><div class="card-body p-4 text-muted">No modules are enabled for your account.</div></div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body d-flex align-items-center flex-wrap gap-2">
+            <span class="fw-semibold me-2">Show</span>
+            @if (enabledModuleCount > 1)
+            {
+                <button type="button" class="btn @(selectedModule == "All" ? "btn-primary" : "btn-outline-primary")" @onclick='() => selectedModule = "All"'>All modules</button>
+            }
+            @if (canViewTickets)
+            {
+                <button type="button" class="btn @(selectedModule == "Tickets" ? "btn-primary" : "btn-outline-primary")" @onclick='() => selectedModule = "Tickets"'><i class="bi bi-ticket-perforated me-1"></i>Support Tickets</button>
+            }
+            @if (canViewOnboarding)
+            {
+                <button type="button" class="btn @(selectedModule == "Onboarding" ? "btn-primary" : "btn-outline-primary")" @onclick='() => selectedModule = "Onboarding"'><i class="bi bi-person-check me-1"></i>Onboarding</button>
+            }
+            @if (canViewTesting)
+            {
+                <button type="button" class="btn @(selectedModule == "Testing" ? "btn-primary" : "btn-outline-primary")" @onclick='() => selectedModule = "Testing"'><i class="bi bi-clipboard2-check me-1"></i>Testing</button>
+            }
+        </div>
+    </div>
+
+    @if (canViewTickets && ShowModule("Tickets"))
+    {
+        <section class="mb-5" aria-labelledby="ticket-reports-heading">
+            <div class="d-flex align-items-center gap-2 mb-3"><span class="report-module-icon bg-primary"><i class="bi bi-ticket-perforated"></i></span><div><h2 id="ticket-reports-heading" class="h4 mb-0">Support Tickets</h2><span class="text-muted small">Workload and priority overview</span></div></div>
+            <div class="row g-3 mb-3">
+                <ReportMetric Label="Total tickets" Value="@tickets.Count" Icon="bi-collection" Accent="primary" OnClick='() => Navigation.NavigateTo("opentickets")' />
+                <ReportMetric Label="Open tickets" Value="@OpenTickets" Icon="bi-inbox" Accent="success" OnClick='() => Navigation.NavigateTo("opentickets")' />
+                <ReportMetric Label="Closed tickets" Value="@ClosedTickets" Icon="bi-check2-circle" Accent="secondary" OnClick='() => Navigation.NavigateTo("closedtickets")' />
+                <ReportMetric Label="High priority" Value="@HighPriorityTickets" Icon="bi-exclamation-triangle" Accent="danger" OnClick='() => Navigation.NavigateTo("opentickets?priority=High")' />
+            </div>
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <div class="card h-100">
+                        <div class="card-header fw-semibold"><i class="bi bi-folder2-open me-2"></i>Tickets by category</div>
+                        <div class="list-group list-group-flush">
+                            @if (TicketCategories.Count == 0)
+                            {
+                                <div class="list-group-item text-muted">No tickets have been recorded yet.</div>
+                            }
+                            else
+                            {
+                                @foreach (var category in TicketCategories)
+                                {
+                                    <div class="list-group-item d-flex justify-content-between align-items-center"><span>@category.Name</span><span class="badge text-bg-primary rounded-pill">@category.Count</span></div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card h-100">
+                        <div class="card-header fw-semibold"><i class="bi bi-people me-2"></i>Tickets by assigned user</div>
+                        <div class="list-group list-group-flush">
+                            @if (TicketsByUser.Count == 0)
+                            {
+                                <div class="list-group-item text-muted">No tickets have been recorded yet.</div>
+                            }
+                            else
+                            {
+                                @foreach (var user in TicketsByUser)
+                                {
+                                    <div class="list-group-item d-flex justify-content-between align-items-center"><span>@user.Name</span><span class="badge text-bg-primary rounded-pill">@user.Count</span></div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+
+    @if (canViewOnboarding && ShowModule("Onboarding"))
+    {
+        <section class="mb-5" aria-labelledby="onboarding-reports-heading">
+            <div class="d-flex align-items-center gap-2 mb-3"><span class="report-module-icon bg-success"><i class="bi bi-person-check"></i></span><div><h2 id="onboarding-reports-heading" class="h4 mb-0">Onboarding</h2><span class="text-muted small">Customer progress and upcoming go-lives</span></div></div>
+            <div class="row g-3 mb-3">
+                <ReportMetric Label="All customers" Value="@onboardings.Count" Icon="bi-people" Accent="primary" OnClick="OpenOnboarding" />
+                <ReportMetric Label="In progress" Value="@ActiveOnboardings" Icon="bi-arrow-repeat" Accent="warning" OnClick="OpenOnboarding" />
+                <ReportMetric Label="Complete" Value="@CompletedOnboardings" Icon="bi-check2-circle" Accent="success" OnClick="OpenOnboarding" />
+                <ReportMetric Label="Go-live in 14 days" Value="@UpcomingGoLives" Icon="bi-calendar-event" Accent="info" OnClick="OpenOnboarding" />
+            </div>
+            <div class="row g-3">
+                <div class="col-lg-5">
+                    <div class="card h-100">
+                        <div class="card-header fw-semibold"><i class="bi bi-box-seam me-2"></i>Customers by software</div>
+                        <div class="list-group list-group-flush">
+                            @if (OnboardingProducts.Count == 0)
+                            {
+                                <div class="list-group-item text-muted">No customer onboardings have been recorded yet.</div>
+                            }
+                            else
+                            {
+                                @foreach (var product in OnboardingProducts)
+                                {
+                                    <div class="list-group-item d-flex justify-content-between align-items-center"><span>@product.Name</span><span class="badge text-bg-success rounded-pill">@product.Count</span></div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-7">
+                    <div class="card h-100">
+                        <div class="card-header fw-semibold"><i class="bi bi-calendar3 me-2"></i>Go-live calendar</div>
+                        @if (UpcomingGoLiveSchedule.Count == 0)
+                        {
+                            <div class="card-body text-muted">There are no planned customer go-lives.</div>
+                        }
+                        else
+                        {
+                            <div class="list-group list-group-flush">
+                                @foreach (var onboarding in UpcomingGoLiveSchedule)
+                                {
+                                    <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-3" @onclick="() => OpenOnboarding(onboarding.Id)">
+                                        <span class="text-center border rounded px-2 py-1 lh-sm"><strong class="d-block">@onboarding.TargetGoLiveDate.ToString("dd")</strong><small>@onboarding.TargetGoLiveDate.ToString("MMM")</small></span>
+                                        <span class="flex-grow-1"><strong class="d-block">@onboarding.CustomerName</strong><small class="text-muted">@onboarding.ProductsPurchased</small></span>
+                                        <span class="badge @OnboardingStatusBadge(onboarding.Status)">@onboarding.Status</span>
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+
+    @if (canViewTesting && ShowModule("Testing"))
+    {
+        <section class="mb-4" aria-labelledby="testing-reports-heading">
+            <div class="d-flex align-items-center gap-2 mb-3"><span class="report-module-icon bg-warning text-dark"><i class="bi bi-clipboard2-check"></i></span><div><h2 id="testing-reports-heading" class="h4 mb-0">Testing</h2><span class="text-muted small">Current release status at a glance</span></div></div>
+            <div class="row g-3 mb-3">
+                <ReportMetric Label="Open releases" Value="@testingWindows.Count" Icon="bi-window-stack" Accent="primary" OnClick='() => Navigation.NavigateTo("testing")' />
+                <ReportMetric Label="Passed" Value="@PassedTests" Icon="bi-check-circle" Accent="success" OnClick='() => Navigation.NavigateTo("testing")' />
+                <ReportMetric Label="In progress" Value="@InProgressTests" Icon="bi-hourglass-split" Accent="warning" OnClick='() => Navigation.NavigateTo("testing")' />
+                <ReportMetric Label="Failed" Value="@FailedTests" Icon="bi-x-circle" Accent="danger" OnClick='() => Navigation.NavigateTo("testing")' />
+            </div>
+        </section>
+    }
+}
+
+@code {
+    private List<Ticket> tickets = new();
+    private List<CustomerOnboarding> onboardings = new();
+    private List<TestRun> currentTestRuns = new();
+    private List<TestingWindow> testingWindows = new();
+    private bool canViewTickets;
+    private bool canViewOnboarding;
+    private bool canViewTesting;
+    private bool isLoaded;
+    private string selectedModule = "All";
+
+    private int enabledModuleCount => (canViewTickets ? 1 : 0) + (canViewOnboarding ? 1 : 0) + (canViewTesting ? 1 : 0);
+    private int OpenTickets => tickets.Count(ticket => string.Equals(ticket.Status, "Open", StringComparison.OrdinalIgnoreCase));
+    private int ClosedTickets => tickets.Count(ticket => string.Equals(ticket.Status, "Closed", StringComparison.OrdinalIgnoreCase));
+    private int HighPriorityTickets => tickets.Count(ticket => string.Equals(ticket.Priority, "High", StringComparison.OrdinalIgnoreCase));
+    private int ActiveOnboardings => onboardings.Count(onboarding => !string.Equals(onboarding.Status, "Complete", StringComparison.OrdinalIgnoreCase));
+    private int CompletedOnboardings => onboardings.Count(onboarding => string.Equals(onboarding.Status, "Complete", StringComparison.OrdinalIgnoreCase));
+    private int UpcomingGoLives => onboardings.Count(onboarding => !string.Equals(onboarding.Status, "Complete", StringComparison.OrdinalIgnoreCase) && onboarding.TargetGoLiveDate.Date >= DateTime.Today && onboarding.TargetGoLiveDate.Date <= DateTime.Today.AddDays(14));
+    private int PassedTests => currentTestRuns.Count(run => run.Status == "Pass");
+    private int InProgressTests => currentTestRuns.Count(run => run.Status == "In Progress");
+    private int FailedTests => currentTestRuns.Count(run => run.Status == "Fail");
+
+    private List<ReportCount> TicketCategories => tickets
+        .GroupBy(ticket => string.IsNullOrWhiteSpace(ticket.Category) ? "Uncategorised" : ticket.Category)
+        .OrderByDescending(group => group.Count()).ThenBy(group => group.Key)
+        .Select(group => new ReportCount(group.Key, group.Count())).ToList();
+
+    private List<ReportCount> TicketsByUser => tickets
+        .GroupBy(ticket => string.IsNullOrWhiteSpace(ticket.AssignedTo) ? "Unassigned" : ticket.AssignedTo)
+        .OrderByDescending(group => group.Count()).ThenBy(group => group.Key)
+        .Select(group => new ReportCount(group.Key, group.Count())).ToList();
+
+    private List<ReportCount> OnboardingProducts => onboardings
+        .SelectMany(onboarding => OnboardingProductCatalog.Parse(onboarding.ProductsPurchased).Products)
+        .GroupBy(product => product).OrderByDescending(group => group.Count()).ThenBy(group => group.Key)
+        .Select(group => new ReportCount(group.Key, group.Count())).ToList();
+
+    private List<CustomerOnboarding> UpcomingGoLiveSchedule => onboardings
+        .Where(onboarding => onboarding.TargetGoLiveDate > DateTime.MinValue)
+        .OrderBy(onboarding => onboarding.TargetGoLiveDate.Date < DateTime.Today ? 1 : 0)
+        .ThenBy(onboarding => onboarding.TargetGoLiveDate)
+        .Take(12)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authenticationState.User;
+        canViewTickets = (await AuthorizationService.AuthorizeAsync(user, "TicketsModule")).Succeeded;
+        canViewOnboarding = (await AuthorizationService.AuthorizeAsync(user, "OnboardingModule")).Succeeded;
+        canViewTesting = (await AuthorizationService.AuthorizeAsync(user, "TestingModule")).Succeeded;
+
+        if (canViewTickets)
+        {
+            await TicketService.LoadAsync();
+            tickets = TicketService.GetTickets().ToList();
+        }
+        if (canViewOnboarding) onboardings = await OnboardingService.GetAllAsync();
+        if (canViewTesting)
+        {
+            currentTestRuns = await TestingService.GetRunsAsync(DateTime.Today);
+            testingWindows = await TestingService.GetWindowsAsync(false);
+        }
+
+        if (enabledModuleCount == 1)
+        {
+            selectedModule = canViewTickets ? "Tickets" : canViewOnboarding ? "Onboarding" : "Testing";
+        }
+        isLoaded = true;
+    }
+
+    private bool ShowModule(string module) => selectedModule == "All" || selectedModule == module;
+    private void OpenOnboarding(int id) => Navigation.NavigateTo($"onboarding/{id}");
+    private void OpenOnboarding() => Navigation.NavigateTo("onboarding");
+    private static string OnboardingStatusBadge(string status) => status switch { "Blocked" => "text-bg-danger", "In Progress" => "text-bg-primary", "Complete" => "text-bg-success", _ => "text-bg-secondary" };
+    private sealed record ReportCount(string Name, int Count);
+}

@@ -1,0 +1,64 @@
+@using ServicePortal.Data
+
+@if (HasSoftware)
+{
+    <div class="onboarding-product-fields">
+        <div class="onboarding-product-fields-heading"><i class="bi bi-window-stack"></i><div><strong>Software Details</strong><div class="text-muted small">Order, build, subscription and training</div></div></div>
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Axosoft ID</label><InputText class="form-control" @bind-Value="Model.AxosoftId" /></div>
+            @if (IsEgta) { <div class="col-md-6"><label class="form-label">eGTA Subscription</label><InputText class="@RequiredClass(true, Model.EgtaSubscription)" @bind-Value="Model.EgtaSubscription" /></div><div class="col-md-6"><label class="form-label">Project No.</label><InputText class="form-control" @bind-Value="Model.ProjectNumber" /></div> }
+            <div class="col-md-6"><label class="form-label">Order Date Accepted</label><InputDate class="@RequiredClass(IsEgta, Model.OrderDateAccepted)" @bind-Value="Model.OrderDateAccepted" /></div>
+            <div class="col-md-6"><label class="form-label">Welcome Email Sent</label><InputDate class="form-control" @bind-Value="Model.WelcomeEmailSentDate" /></div>
+            <div class="col-md-6"><label class="form-label">Date Payment Received</label><InputDate class="form-control" @bind-Value="Model.PaymentReceivedDate" /></div>
+            <div class="col-md-6"><label class="form-label">Planned Go-Live</label><InputDate class="form-control" @bind-Value="Model.TargetGoLiveDate" /></div>
+            <div class="col-md-6"><label class="form-label">Subscription Start Date</label><InputDate class="@RequiredClass(IsEgta, Model.SubscriptionStartDate)" @bind-Value="Model.SubscriptionStartDate" /></div>
+            <div class="col-md-6"><label class="form-label">Subscription Invoice No.</label><InputText class="form-control" @bind-Value="Model.SubscriptionInvoiceNumber" /></div>
+            <div class="col-md-6"><label class="form-label">System Build</label><InputSelect class="@RequiredClass(IsEgta, Model.SystemBuildStatus, true)" @bind-Value="Model.SystemBuildStatus"><option value="">Select status</option><option>Not Started</option><option>In Progress</option><option>On Hold</option><option>Completed</option></InputSelect></div>
+            <div class="col-md-6"><label class="form-label">Send to Brokerage</label><InputSelect class="form-select" @bind-Value="Model.SendToBrokerage"><option value="">Select option</option><option>Yes</option><option>No</option><option>N/A</option></InputSelect></div>
+            <div class="col-md-6"><label class="form-label">Training</label><InputSelect class="form-select" @bind-Value="Model.TrainingStatus"><option value="">Select status</option><option>Completed</option><option>Outstanding</option><option>On Hold</option></InputSelect></div>
+            <div class="col-md-6"><label class="form-label">Training Required</label><InputSelect class="form-select" @bind-Value="Model.TrainingRequired"><option value="false">No</option><option value="true">Yes</option></InputSelect></div>
+            <SalesManagerFields Model="Model" IncludeSalesManager="false" RequireSalesOwner="@IsEgta" />
+            <div class="col-12"><label class="form-label">Software Owner</label><SoftwareOwnerSelector @bind-Value="Model.SoftwareOwners" /></div>
+        </div>
+    </div>
+}
+
+@if (HasProduct("TransitNet"))
+{
+    <div class="onboarding-product-fields">
+        <div class="onboarding-product-fields-heading"><i class="bi bi-truck"></i><div><strong>TransitNet Details</strong><div class="text-muted small">Commercial setup, delivery and go-live</div></div></div>
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Client Number</label><InputText class="form-control" @bind-Value="Model.ClientNumber" /></div>
+            <div class="col-md-6"><label class="form-label">Signed Documents Received</label><InputDate class="@RequiredClass(true, Model.SignedDocumentsReceivedDate)" @bind-Value="Model.SignedDocumentsReceivedDate" /></div>
+            <div class="col-md-6"><label class="form-label">Welcome Email Sent</label><InputDate class="form-control" @bind-Value="Model.WelcomeEmailSentDate" /></div>
+            <div class="col-md-6"><label class="form-label">Onboarding Questionnaire Received</label><InputDate class="form-control" @bind-Value="Model.OnboardingQuestionnaireReceivedDate" /></div>
+            <div class="col-md-6"><label class="form-label">Order Date Accepted</label><InputDate class="form-control" @bind-Value="Model.OrderDateAccepted" /></div>
+            <div class="col-md-6"><label class="form-label">Finance Notified</label><InputDate class="form-control" @bind-Value="Model.FinanceNotifiedDate" /></div>
+            <div class="col-md-6"><label class="form-label">Admin Tool and Price Group</label><InputDate class="form-control" @bind-Value="Model.AdminToolAndPriceGroupDate" /></div>
+            <div class="col-md-6"><label class="form-label">Pricing Setup (IT)</label><InputDate class="form-control" @bind-Value="Model.PricingSetupDate" /></div>
+            <div class="col-md-6"><label class="form-label">BO Notified</label><InputDate class="form-control" @bind-Value="Model.BackOfficeNotifiedDate" /></div>
+            <div class="col-md-6"><label class="form-label">System Build</label><InputDate class="form-control" @bind-Value="Model.SystemBuildDate" /></div>
+            <div class="col-md-6"><label class="form-label">TNet Subscription</label><InputSelect class="@RequiredClass(true, Model.TNetSubscription, true)" @bind-Value="Model.TNetSubscription"><option value="">Select subscription</option><option>BCC</option><option>e-Client</option><option>Full</option></InputSelect></div>
+            <div class="col-md-6"><label class="form-label">Training Required</label><InputSelect class="form-select" @bind-Value="Model.TrainingRequired"><option value="false">No</option><option value="true">Yes</option></InputSelect></div>
+            <div class="col-md-6"><label class="form-label">DD Confirmed</label><InputDate class="form-control" @bind-Value="Model.DDConfirmedDate" /></div>
+            <div class="col-md-6"><label class="form-label">Training Given</label><InputSelect class="@RequiredClass(true, Model.TrainingGivenStatus, true)" @bind-Value="Model.TrainingGivenStatus"><option value="">Select status</option><option>Yes</option><option>No</option><option>TBC</option><option>N/A</option><option>Outstanding</option></InputSelect></div>
+            <div class="col-md-6"><label class="form-label">Practice Site Access</label><InputSelect class="form-select" @bind-Value="Model.PracticeSiteAccessDetails"><option value="">Select status</option><option>Complete</option><option>Outstanding</option></InputSelect></div>
+            <div class="col-md-6"><label class="form-label">Planned Go-Live</label><InputDate class="form-control" @bind-Value="Model.TargetGoLiveDate" /></div>
+            <SalesManagerFields Model="Model" IncludeSalesManager="false" RequireSalesOwner="true" />
+            <div class="col-md-6"><label class="form-label">SharePoint URL</label><InputText class="form-control" type="url" @bind-Value="Model.SharePointUrl" /></div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public CustomerOnboarding Model { get; set; } = default!;
+    private bool HasSoftware => HasProduct("eCERT") || HasProduct("eGTA");
+    private bool IsEgta => HasProduct("eGTA");
+    private bool HasProduct(string product) => OnboardingProductCatalog.Parse(Model.ProductsPurchased).Products.Contains(product);
+    private static string RequiredClass(bool required, string? value, bool select = false) => $"{(select ? "form-select" : "form-control")} {(required && string.IsNullOrWhiteSpace(value) ? "missing-field" : "")}";
+    private static string RequiredClass(bool required, DateTime? value) => $"form-control {(required && !value.HasValue ? "missing-field" : "")}";
+}
+
+
+
+

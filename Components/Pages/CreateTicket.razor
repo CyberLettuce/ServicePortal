@@ -1,0 +1,250 @@
+@page "/tickets/new"
+
+@using ServicePortal.Models
+@using ServicePortal.Data
+@using ServicePortal.Services
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize(Policy = "TicketsModule")]
+
+@rendermode InteractiveServer
+
+@inject TicketService TicketService
+@inject SettingsService SettingsService
+@inject ChamberService ChamberService
+@inject KnowledgeBaseService KnowledgeBaseService
+@inject NavigationManager Navigation
+
+<PageTitle>Create Ticket</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+        <h1 class="mb-1">Create Ticket</h1>
+        <p class="text-muted mb-0">
+            Add a new ticket to the open queue.
+        </p>
+    </div>
+
+    <button type="button"
+            class="btn btn-outline-secondary"
+            @onclick="Cancel">
+        <i class="bi bi-arrow-left me-1"></i>
+        Back to Open Tickets
+    </button>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">
+        @errorMessage
+    </div>
+}
+
+<div class="card">
+    <div class="card-header">
+        <strong>Ticket details</strong>
+    </div>
+
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label">Apply template</label>
+            <select class="form-select" @onchange="ApplyTemplate">
+                <option value="">Start from scratch</option>
+                @foreach (var template in templates) { <option value="@template.Id">@template.Name</option> }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <input class="form-control"
+                   value="@description"
+                   @oninput="OnDescriptionInput"
+                   placeholder="Describe the issue or request" />
+        </div>
+
+        @if (templates.Any())
+        {
+            <div class="row g-3 mb-3">
+                <div class="col-md-6"><label class="form-label">Main Issue</label><input class="form-control" @bind="mainIssue" /></div>
+                <div class="col-md-6"><label class="form-label">References (LRN)</label><input class="form-control" @bind="referencesLrn" /></div>
+                <div class="col-md-6"><label class="form-label">Main Contact</label><input class="form-control" @bind="mainContact" /></div>
+                @if (category == "eGTA") { <div class="col-md-6"><label class="form-label">Software Module</label><select class="form-select" @bind="softwareModule"><option value=""></option><option>CDS Imports</option><option>CDS Exports</option><option>EMCS</option><option>ENS (S&amp;SGB)</option><option>GVMS</option><option>ICS2</option><option>Shipments</option></select></div> }
+                <div class="col-12"><label class="form-label">Actions Taken</label><textarea class="form-control" rows="3" @bind="actionsTaken"></textarea></div>
+            </div>
+        }
+
+        @if (suggestedArticles.Count > 0)
+        {
+            <div class="card border-primary mb-3"><div class="card-body py-3"><strong><i class="bi bi-lightbulb me-2"></i>Suggested Knowledge Base articles</strong><div class="mt-2">@foreach (var article in suggestedArticles) { <a class="d-block mb-1" href="knowledge-base/article/@article.Id">@article.Title</a> }</div></div></div>
+        }
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Priority</label>
+                <select class="form-select" @bind="priority">
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Category</label>
+                <select class="form-select" @bind="category">
+                    <option value="eCERT">eCERT</option>
+                    <option value="eCONSIGN">eCONSIGN</option>
+                    <option value="eGTA">eGTA</option>
+                    <option value="UKCS Portal">UKCS Portal</option>
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Assigned To</label>
+                <select class="form-select" @bind="assignedTo">
+                    @foreach (var user in supportUsers)
+                    {
+                        <option value="@user">@user</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @if (category == "eCERT")
+        {
+            <div class="mt-3">
+                <label class="form-label">Chamber of Commerce</label>
+                <select class="form-select" @bind="chamberOfCommerce"><option value="">Select a chamber</option>@foreach (var chamber in chambers) { <option value="@chamber">@chamber</option> }</select>
+            </div>
+        }
+
+        <div class="mt-4">
+            <button type="button"
+                    class="btn btn-success me-2"
+                    @onclick="CreateAsync"
+                    disabled="@isCreating">
+                @if (isCreating)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"
+                          role="status">
+                    </span>
+                    <span>Creating...</span>
+                }
+                else
+                {
+                    <i class="bi bi-plus-lg me-1"></i>
+                    <span>Create Ticket</span>
+                }
+            </button>
+
+            <button type="button"
+                    class="btn btn-outline-secondary"
+                    @onclick="Cancel"
+                    disabled="@isCreating">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+@code
+{
+    private string description = string.Empty;
+    private string priority = "Low";
+    private string category = "eCERT";
+    private string assignedTo = "Unassigned";
+    private string? errorMessage;
+    private bool isCreating;
+    private List<string> supportUsers = new();
+    private List<string> chambers = new();
+    private string chamberOfCommerce = string.Empty;
+    private List<KnowledgeArticle> suggestedArticles = new();
+    private List<TicketTemplate> templates = new();
+    private string mainIssue = string.Empty, referencesLrn = string.Empty, mainContact = string.Empty, actionsTaken = string.Empty, softwareModule = string.Empty, mrn = string.Empty, arc = string.Empty, tsn = string.Empty, shipmentReference = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TicketService.LoadAsync();
+
+        supportUsers = await TicketService.GetAssignableUserDisplayNamesAsync();
+        chambers = await ChamberService.GetNamesAsync();
+        templates = await TicketService.GetTemplatesAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await SettingsService.LoadAsync();
+
+        priority = SettingsService.Current.DefaultPriority;
+        category = SettingsService.Current.DefaultCategory;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CreateAsync()
+    {
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            errorMessage = "Please enter a description.";
+            return;
+        }
+
+        isCreating = true;
+
+        try
+        {
+            var ticketNumber = await TicketService.AddTicketAsync(new Ticket
+            {
+                Description = description.Trim(),
+                Priority = priority,
+                Status = "Open",
+                Category = category,
+                ChamberOfCommerce = chamberOfCommerce,
+                MainIssue = mainIssue, AdditionalDetails = description.Trim(), ReferencesLrn = referencesLrn, MainContact = mainContact, ActionsTaken = actionsTaken, SoftwareModule = softwareModule, Mrn = mrn, Arc = arc, Tsn = tsn, ShipmentReference = shipmentReference,
+                AssignedTo = assignedTo,
+                CreatedDate = DateTime.Now
+            });
+
+            Navigation.NavigateTo($"ticket/{ticketNumber}");
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    private async Task OnDescriptionInput(ChangeEventArgs args)
+    {
+        description = args.Value?.ToString() ?? string.Empty;
+        suggestedArticles = string.IsNullOrWhiteSpace(description) || description.Length < 3
+            ? new()
+            : (await KnowledgeBaseService.SearchAsync(description)).Take(3).ToList();
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("opentickets");
+    }
+
+    private void ApplyTemplate(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var id)) return;
+        var template = templates.FirstOrDefault(item => item.Id == id);
+        if (template is null) return;
+        description = template.AdditionalDetails;
+        mainIssue = template.MainIssue;
+        referencesLrn = template.ReferencesLrn;
+        mainContact = template.MainContact;
+        actionsTaken = template.ActionsTaken;
+        softwareModule = template.SoftwareModule; mrn = template.Mrn; arc = template.Arc; tsn = template.Tsn; shipmentReference = template.ShipmentReference;
+        priority = template.Priority;
+        category = template.Category;
+        assignedTo = template.AssignedTo;
+    }
+}

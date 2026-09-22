@@ -1,0 +1,115 @@
+@page "/testing/test/{RunId:int}"
+@rendermode InteractiveServer
+@using ServicePortal.Data
+@using ServicePortal.Services
+@using ServicePortal.Components.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@attribute [Authorize(Policy = "TestingModule")]
+@inject TestingService TestingService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Test Point</PageTitle>
+
+@if (run is null)
+{
+    <div class="alert alert-warning">This test point could not be found.</div>
+    <a class="btn btn-outline-primary" href="testing">Back to Current Testing</a>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div>
+            <a class="text-decoration-none small" href="testing"><i class="bi bi-arrow-left me-1"></i>Current Testing</a>
+            <h1 class="mb-1 mt-2">@run.TestCaseName</h1>
+            <p class="text-muted mb-0">@run.Product · Release @run.ReleaseNumber · Axosoft ID: @run.Scope</p>
+        </div>
+        <button class="btn btn-primary" @onclick="SaveAsync"><i class="bi bi-check-lg me-1"></i>Save changes</button>
+    </div>
+
+    @if (message is not null) { <div class="alert @messageClass">@message</div> }
+
+    <div class="row g-4">
+        <div class="col-lg-7"><div class="card testing-detail-card"><div class="card-header testing-detail-header"><i class="bi bi-clipboard2-check"></i><div><strong>Testing details</strong><div class="small">Testers, status and release notes</div></div></div><div class="card-body">
+            <div class="mb-3"><label class="form-label">Status</label><select class="form-select" @bind="run.Status">@foreach (var status in Statuses) { <option value="@status">@status</option> }</select></div>
+            <div class="row g-3"><div class="col-md-6"><label class="form-label">Tester</label><select class="form-select" @bind="run.TestedBy"><option value="">Select tester</option>@foreach (var tester in testers) { <option value="@tester">@tester</option> }</select></div><div class="col-md-6"><label class="form-label">Second tester</label><select class="form-select" @bind="run.SecondTestedBy"><option value="">Select tester</option>@foreach (var tester in testers) { <option value="@tester">@tester</option> }</select></div></div>
+            <div class="mt-3"><RichTextEditor Label="Notes" @bind-Value="run.AxosoftNotes" Placeholder="Imported Axosoft notes." EnableComments="true" CommentAuthor="@currentUser" /></div>
+            <div class="mt-3"><RichTextEditor Label="Test Notes" @bind-Value="run.Notes" Placeholder="Record findings, blockers, or follow-up work." EnableComments="true" CommentAuthor="@currentUser" /></div>
+            <div class="mt-3"><RichTextEditor Label="Release Notes" @bind-Value="run.ReleaseNotes" Placeholder="Record release-specific notes." EnableComments="true" CommentAuthor="@currentUser" /></div>
+        </div></div></div>
+        <div class="@(isRegressionTest ? "col-12" : "col-lg-5")">
+            @if (isRegressionTest)
+            {
+                <div class="card testing-detail-card"><div class="card-header testing-detail-header"><i class="bi bi-list-check"></i><div><strong>Regression test checklist</strong><div class="small">Complete each required check for this release</div></div></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Test</th><th>Status</th><th>Tester</th><th>Second tester</th><th>Notes</th></tr></thead><tbody>@foreach (var environment in regressionTests.GroupBy(test => EnvironmentOf(test.Scope)).OrderBy(group => EnvironmentOrder(group.Key))) { @if (environment.Key == "Live Environment") { <tr class="regression-environment-spacer"><td colspan="5"></td></tr> } <tr class="regression-environment-row"><td colspan="5"><strong>@environment.Key</strong></td></tr>@foreach (var country in environment.GroupBy(test => CountryOf(test.Scope)).OrderBy(group => ChamberOrder(group.Key))) { <tr class="@ChamberClass(country.Key)"><td colspan="5"><strong>@country.Key</strong></td></tr>@foreach (var test in country.OrderBy(TestOrder)) { <tr><td><strong>@test.TestCaseName</strong></td><td><select class="form-select form-select-sm @SelectClass(test.Status)" @bind="test.Status">@foreach (var status in Statuses) { <option value="@status">@status</option> }</select></td><td><select class="form-select form-select-sm" @bind="test.TestedBy"><option value="">Select tester</option>@foreach (var tester in testers) { <option value="@tester">@tester</option> }</select></td><td><select class="form-select form-select-sm" @bind="test.SecondTestedBy"><option value="">Select tester</option>@foreach (var tester in testers) { <option value="@tester">@tester</option> }</select></td><td><textarea class="form-control form-control-sm" rows="2" @bind="test.Notes" placeholder="Notes"></textarea></td></tr> } } }</tbody></table></div></div></div>
+                @if (run.Product == "eCERT") { <div class="card mt-4"><div class="card-header"><strong>Regression test reference data</strong></div><div class="card-body"><p class="text-muted small">Stripe dummy card details for payment test scenarios.</p><div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>Card</th><th>Number</th><th>Security code</th><th>Expiry date</th></tr></thead><tbody>@foreach (var card in StripeTestCards) { <tr><td>@card.Name</td><td><code>@card.Number</code></td><td>@card.SecurityCode</td><td>Any future date</td></tr> }</tbody></table></div></div></div> }
+            }
+            else
+            {
+                <div class="card testing-detail-card"><div class="card-header testing-detail-header"><i class="bi bi-clipboard-data"></i><div><strong>Test results</strong><div class="small">Point testing and user acceptance results</div></div></div><div class="card-body">
+                    <div class="mb-3"><RichTextEditor Label="Point Test" @bind-Value="run.PointTest" Placeholder="Record the point-test result." EnableComments="true" CommentAuthor="@currentUser" /></div>
+                    <div><RichTextEditor Label="UAT Test" @bind-Value="run.UatTest" Placeholder="Record the UAT result." EnableComments="true" CommentAuthor="@currentUser" /></div>
+                </div></div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int RunId { get; set; }
+    private static readonly string[] Statuses = ["Not Started", "In Progress", "Pass", "Fail"];
+    private TestRun? run;
+    private List<string> testers = new();
+    private List<RegressionTestItem> regressionTests = new();
+    private string currentUser = "Unknown user";
+    private string? message;
+    private string messageClass = "alert-success";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authenticationState.User);
+        currentUser = user?.DisplayName ?? user?.Email ?? "Unknown user";
+        run = await TestingService.GetRunAsync(RunId);
+        testers = await TestingService.GetTestersAsync();
+        regressionTests = run is null ? new() : TestingService.GetRegressionTests(run);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (run is null) return;
+        if (await TestingService.UpdateRunAsync(run))
+        {
+            if (isRegressionTest) await TestingService.UpdateRegressionTestsAsync(run.Id, regressionTests);
+            message = "Test point saved.";
+            messageClass = "alert-success";
+        }
+        else
+        {
+            message = "This test point is no longer available.";
+            messageClass = "alert-warning";
+        }
+    }
+
+    private bool isRegressionTest => run is not null && !string.IsNullOrWhiteSpace(run.RegressionTestsJson);
+    private static string SelectClass(string status) => status switch { "Pass" => "border-success text-success", "Fail" => "border-danger text-danger", "In Progress" => "border-warning text-warning-emphasis", _ => string.Empty };
+    private static readonly (string Name, string Number, string SecurityCode)[] StripeTestCards = [
+        ("Visa", "4242424242424242", "Any 3 digits"), ("Visa (debit)", "4000056655665556", "Any 3 digits"),
+        ("Mastercard", "5555555555554444", "Any 3 digits"), ("Mastercard (2-series)", "2223003122003222", "Any 3 digits"),
+        ("Mastercard (debit)", "5200828282828210", "Any 3 digits"), ("Mastercard (prepaid)", "5105105105105100", "Any 3 digits"),
+        ("American Express", "378282246310005", "Any 4 digits"), ("American Express", "371449635398431", "Any 4 digits"),
+        ("Discover", "6011111111111117", "Any 3 digits"), ("Discover", "6011000990139424", "Any 3 digits"),
+        ("Discover (debit)", "6011981111111113", "Any 3 digits"), ("Diners Club", "3056930009020004", "Any 3 digits"),
+        ("Diners Club (14-digit card)", "36227206271667", "Any 3 digits"), ("BCcard and DinaCard", "6555900000604105", "Any 3 digits"),
+        ("JCB", "3566002020360505", "Any 3 digits"), ("UnionPay", "6200000000000005", "Any 3 digits"),
+        ("UnionPay (debit)", "6200000000000047", "Any 3 digits")];
+    private static string EnvironmentOf(string scope) => scope.Split(" · ", StringSplitOptions.None).FirstOrDefault() ?? "Regression Testing";
+    private static string CountryOf(string scope) { var country = scope.Split(" · ", StringSplitOptions.None).Skip(1).FirstOrDefault() ?? "General"; return country == "ML Chamber" ? "MT Chamber" : country; }
+    private static int EnvironmentOrder(string environment) => environment == "Test Environment" ? 0 : environment == "Live Environment" ? 1 : 2;
+    private static int ChamberOrder(string chamber) => chamber switch { "UK Chamber" => 0, "MT Chamber" => 1, "CA Chamber" => 2, "IE Chamber" => 3, _ => 4 };
+    private static string ChamberClass(string chamber) => chamber switch { "CA Chamber" => "regression-chamber-ca", "IE Chamber" => "regression-chamber-ie", "MT Chamber" => "regression-chamber-mt", "UK Chamber" => "regression-chamber-uk", _ => "regression-chamber-general" };
+    private static int TestOrder(RegressionTestItem test) => test.TestCaseName switch { var name when name.StartsWith("New Applications") => 0, var name when name.StartsWith("Test Application") => 1, var name when name.StartsWith("Stored Data") => 2, var name when name.StartsWith("Applications") => 3, var name when name.StartsWith("Certificate Verification") => 4, var name when name.StartsWith("General CRUD") => 5, var name when name.StartsWith("Live Chat") => 6, var name when name.StartsWith("All Points") => 7, var name when name.StartsWith("Browsers") => 8, var name when name.StartsWith("SSO") => 9, _ => 10 };
+}
+

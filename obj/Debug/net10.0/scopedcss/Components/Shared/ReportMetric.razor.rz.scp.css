@@ -1,0 +1,27 @@
+.report-metric[b-vjqi0bziy4] {
+    border: 1px solid var(--bs-border-color);
+}
+
+.report-metric-link[b-vjqi0bziy4] {
+    color: inherit;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.report-metric-link:hover[b-vjqi0bziy4] {
+    color: inherit;
+    box-shadow: 0 .35rem 1rem rgba(15, 23, 42, .12);
+    transform: translateY(-2px);
+}
+
+.report-metric-icon[b-vjqi0bziy4],
+.report-module-icon[b-vjqi0bziy4] {
+    align-items: center;
+    border-radius: .75rem;
+    color: #fff;
+    display: inline-flex;
+    font-size: 1.25rem;
+    height: 2.75rem;
+    justify-content: center;
+    width: 2.75rem;
+}

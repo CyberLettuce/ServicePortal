@@ -1,0 +1,1024 @@
+@page "/ticket/{TicketNumber:int}"
+
+@using Microsoft.AspNetCore.Authorization
+@using ServicePortal.Data
+
+@attribute [Authorize(Policy = "TicketsModule")]
+
+@rendermode InteractiveServer
+
+@using ServicePortal.Services
+@using TicketModel = ServicePortal.Models.Ticket
+
+@inject TicketService TicketService
+@inject SettingsService SettingsService
+@inject ChamberService ChamberService
+@inject ProjectService ProjectService
+@inject ExistingCustomerService ExistingCustomerService
+@inject NavigationManager Navigation
+
+<PageTitle>Ticket #@TicketNumber</PageTitle>
+
+@if (ticket == null)
+{
+    <div class="alert alert-info">
+        Loading ticket...
+    </div>
+}
+else
+{
+    <!-- Ticket Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <h1 class="mb-1">
+                Ticket #@(string.IsNullOrWhiteSpace(ticket.TicketReference) ? $"#{ticket.TicketNumber}" : ticket.TicketReference)
+            </h1>
+
+            <div class="text-muted">
+                Created @ticket.CreatedDate.ToString("dd/MM/yyyy HH:mm")
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+
+            @if (ticket.Status == "Open")
+            {
+                <span class="badge bg-success fs-6">
+                    Open
+                </span>
+            }
+            else
+            {
+                <span class="badge bg-secondary fs-6">
+                    Closed
+                </span>
+            }
+
+            @if (ticket.Priority == "High")
+            {
+                <span class="badge bg-danger fs-6">
+                    High Priority
+                </span>
+            }
+            else if (ticket.Priority == "Medium")
+            {
+                <span class="badge bg-warning text-dark fs-6">
+                    Medium Priority
+                </span>
+            }
+            else
+            {
+                <span class="badge bg-secondary fs-6">
+                    Low Priority
+                </span>
+            }
+
+        </div>
+
+    </div>
+
+
+    <!-- Main Ticket Card -->
+    <div class="card ticket-details-surface">
+
+        <div class="card-header d-flex justify-content-between align-items-center">
+
+            <div class="ticket-details-heading"><i class="bi bi-ticket-detailed"></i><div><strong>Ticket Details</strong><div class="small">Ticket information, assignment and activity</div></div></div>
+
+            @if (!editing)
+            {
+                <button type="button"
+                        class="btn btn-primary"
+                        @onclick="StartEditing">
+
+                    <i class="bi bi-pencil me-1"></i>
+                    Edit Ticket
+
+                </button>
+            }
+
+        </div>
+
+
+        <div class="card-body">
+
+            @if (!editing)
+            {
+                <!-- VIEW MODE -->
+
+                <div class="row mb-4">
+
+                    <div class="col-md-4">
+
+                        <div class="text-muted small">
+                            Ticket Number
+                        </div>
+
+                        <div class="fw-semibold">
+                            #@(string.IsNullOrWhiteSpace(ticket.TicketReference) ? $"#{ticket.TicketNumber}" : ticket.TicketReference)
+                        </div>
+
+                    </div>
+
+                    @if (ticket.Category == "eCERT")
+                    {
+                        <div class="col-md-4"><div class="text-muted small">Chamber of Commerce</div><div class="fw-semibold">@(string.IsNullOrWhiteSpace(ticket.ChamberOfCommerce) ? "Not selected" : ticket.ChamberOfCommerce)</div></div>
+                    }
+
+                    <div class="col-md-4">
+
+                        <div class="text-muted small">
+                            Category
+                        </div>
+
+                        <div class="fw-semibold">
+                            @ticket.Category
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <div class="text-muted small">
+                            Assigned To
+                        </div>
+
+                        <div class="fw-semibold">
+
+                            @(string.IsNullOrWhiteSpace(ticket.AssignedTo)
+                                ? "Unassigned"
+                                : ticket.AssignedTo)
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="row mb-4">
+
+                    <div class="col-md-4">
+
+                        <div class="text-muted small">
+                            Status
+                        </div>
+
+                        <div>
+
+                            @if (ticket.Status == "Open")
+                            {
+                                <span class="badge bg-success">
+                                    Open
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">
+                                    Closed
+                                </span>
+                            }
+
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <div class="text-muted small">
+                            Priority
+                        </div>
+
+                        <div>
+
+                            @if (ticket.Priority == "High")
+                            {
+                                <span class="badge bg-danger">
+                                    High
+                                </span>
+                            }
+                            else if (ticket.Priority == "Medium")
+                            {
+                                <span class="badge bg-warning text-dark">
+                                    Medium
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">
+                                    Low
+                                </span>
+                            }
+
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <div class="text-muted small">
+                            Created
+                        </div>
+
+                        <div class="fw-semibold">
+                            @ticket.CreatedDate.ToString("dd/MM/yyyy HH:mm")
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="text-muted small">Linked Project</div>
+                        @if (linkedProject is null)
+                        {
+                            <div class="text-muted">Not linked</div>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-link p-0 fw-semibold" @onclick='() => Navigation.NavigateTo($"projects/{linkedProject.Id}")'>
+                                <i class="bi bi-kanban me-1"></i>@linkedProject.Name
+                            </button>
+                        }
+                    </div>
+
+                </div>
+
+                @if (AdditionalDetails.Any())
+                {
+                    <div class="row g-3 mb-4">
+                        @foreach (var detail in AdditionalDetails)
+                        {
+                            <div class="col-md-4">
+                                <div class="text-muted small">@detail.Label</div>
+                                <div class="fw-semibold">@detail.Value</div>
+                            </div>
+                        }
+                    </div>
+                }
+
+
+                <hr />
+
+
+                <!-- Description -->
+                <div class="mb-4">
+
+                    <h5>
+                        Description
+                    </h5>
+
+                    @if (string.IsNullOrWhiteSpace(ticket.Description))
+                    {
+                        <div class="text-muted">
+                            No description provided.
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="white-space: pre-wrap;">
+                            @ticket.Description
+                        </div>
+                    }
+
+                </div>
+
+
+                <!-- Notes -->
+                <div class="mb-4">
+                    <h5>Email conversation</h5>
+
+                    @if (ticket.EmailMessages.Count == 0)
+                    {
+                        <div class="text-muted">
+                            This ticket does not have an email conversation yet.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var email in ticket.EmailMessages
+                            .OrderBy(message => message.SentAt))
+                        {
+                            <div class="border rounded p-3 mb-2 @(email.Direction == "Incoming" ? "bg-light" : "border-primary")">
+                                <div class="d-flex justify-content-between gap-3">
+                                    <strong>@(email.Direction == "Incoming" ? email.From : "You")</strong>
+                                    <span class="text-muted small">@email.SentAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                                </div>
+                                <div class="small text-muted mb-2">@email.Subject</div>
+                                <div style="white-space: pre-wrap;">@email.Body</div>
+                            </div>
+                        }
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(ticket.RequesterEmail))
+                    {
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <strong>Reply to @ticket.RequesterEmail</strong>
+                            </div>
+                            <div class="card-body">
+                                <textarea class="form-control"
+                                          rows="4"
+                                          @bind="replyBody"
+                                          placeholder="Write a reply to the customer..."></textarea>
+                                <button type="button"
+                                        class="btn btn-primary mt-3"
+                                        @onclick="SendReplyAsync"
+                                        disabled="@string.IsNullOrWhiteSpace(replyBody)">
+                                    <i class="bi bi-send me-1"></i>
+                                    Send reply
+                                </button>
+                                <div class="form-text mt-2">
+                                    Replies are recorded here and will send through Microsoft 365 once the mailbox connection is configured.
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Notes -->
+                <div class="mb-4">
+
+                    <h5>
+                        Notes
+                    </h5>
+
+                    @if (string.IsNullOrWhiteSpace(ticket.Notes))
+                    {
+                        <div class="text-muted">
+                            No notes have been added.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="border rounded p-3 bg-light"
+                             style="white-space: pre-wrap;">
+
+                            @ticket.Notes
+
+                        </div>
+                    }
+
+                </div>
+
+            }
+            else
+            {
+                <!-- EDIT MODE -->
+
+                <div class="alert alert-info">
+
+                    <strong>Editing Ticket #@(string.IsNullOrWhiteSpace(ticket.TicketReference) ? $"#{ticket.TicketNumber}" : ticket.TicketReference)</strong>
+
+                    <div class="mt-1">
+                        Make your changes and select
+                        <strong>Save Changes</strong>
+                        when finished.
+                    </div>
+
+                </div>
+
+
+                <div class="row mb-3">
+
+                    <div class="col-md-6">
+
+                        <label class="form-label">
+                            <strong>Ticket Number</strong>
+                        </label>
+
+                        <input class="form-control"
+                               value="@(string.IsNullOrWhiteSpace(ticket.TicketReference) ? $"#{ticket.TicketNumber}" : ticket.TicketReference)"
+                               disabled />
+
+                    </div>
+
+                    <div class="col-md-6">
+
+                        <label class="form-label">
+                            <strong>Status</strong>
+                        </label>
+
+                        <select class="form-select"
+                                @bind="ticket.Status">
+
+                            <option value="Open">
+                                Open
+                            </option>
+
+                            <option value="Closed">
+                                Closed
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+                <div class="row mb-3">
+
+                    <div class="col-md-6">
+
+                        <label class="form-label">
+                            <strong>Priority</strong>
+                        </label>
+
+                        <select class="form-select"
+                                @bind="ticket.Priority">
+
+                            <option value="Low">
+                                Low
+                            </option>
+
+                            <option value="Medium">
+                                Medium
+                            </option>
+
+                            <option value="High">
+                                High
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="col-md-6">
+
+                        <label class="form-label">
+                            <strong>Category</strong>
+                        </label>
+
+                        <select class="form-select"
+                                @bind="ticket.Category" @bind:after="CategoryChanged">
+
+                            <option value="eCERT">
+                                eCERT
+                            </option>
+
+                            <option value="eGTA">
+                                eGTA
+                            </option>
+
+                            <option value="UKCS Portal">
+                                UKCS Portal
+                            </option>
+
+                            <option value="eCONSIGN">
+                                eCONSIGN
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+                @if (ticket.Category == "eCERT")
+                {
+                    <div class="mb-3"><label class="form-label"><strong>Chamber of Commerce</strong></label><select class="form-select" @bind="ticket.ChamberOfCommerce"><option value="">Select a chamber</option>@foreach (var chamber in chambers) { <option value="@chamber">@chamber</option> }</select></div>
+                }
+
+                <div class="mb-3"><label class="form-label"><strong>Link to Existing Customer</strong></label><select class="form-select" @bind="ticket.ExistingCustomerId"><option value="">Not linked to a customer</option>@foreach (var customer in MatchingExistingCustomers) { <option value="@customer.Id">@customer.CustomerName</option> }</select></div>
+                @if(ticket.Category == "eGTA"){<div class="mb-3"><label class="form-label"><strong>Software Module</strong></label><div class="ticket-egta-options"><div class="ticket-egta-options-grid">@foreach(var option in EgtaOptions){<label class="ticket-egta-option @(IsEgtaSelected(option) ? "selected" : "")"><input type="checkbox" class="form-check-input" checked="@IsEgtaSelected(option)" @onchange="()=>ToggleEgtaOption(option)" /><span>@option</span></label>}</div></div></div>}
+
+
+                <div class="mb-3">
+
+                    <label class="form-label">
+                        <strong>Assigned To</strong>
+                    </label>
+
+                    <select class="form-select"
+                            @bind="ticket.AssignedTo">
+
+                        @foreach (var user in supportUsers)
+                        {
+                            <option value="@user">
+                                @user
+                            </option>
+                        }
+
+                    </select>
+
+                </div>
+
+                <div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label"><strong>Main Issue</strong></label><input class="form-control" @bind="ticket.MainIssue" /></div><div class="col-md-6"><label class="form-label"><strong>References (LRN)</strong></label><input class="form-control" @bind="ticket.ReferencesLrn" /></div><div class="col-md-6"><label class="form-label"><strong>Main Contact</strong></label><input class="form-control" @bind="ticket.MainContact" /></div>@if(ticket.Category == "eGTA"){<div class="col-md-6"><label class="form-label"><strong>Software Module</strong></label><div class="ticket-egta-options"><div class="ticket-egta-options-grid">@foreach(var option in EgtaOptions){<label class="ticket-egta-option @(IsEgtaSelected(option) ? "selected" : "")"><input type="checkbox" class="form-check-input" checked="@IsEgtaSelected(option)" @onchange="()=>ToggleEgtaOption(option)" /><span>@option</span></label>}</div></div></div>}<div class="col-12"><label class="form-label"><strong>Actions Taken</strong></label><textarea class="form-control" rows="3" @bind="ticket.ActionsTaken"></textarea></div></div>
+
+
+                <div class="mb-3">
+
+                    <label class="form-label">
+                        <strong>Additional Details</strong>
+                    </label>
+
+                    <textarea class="form-control"
+                              rows="5"
+                              @bind="ticket.AdditionalDetails">
+                    </textarea>
+
+                </div>
+
+
+                <div class="mb-4">
+
+                    <label class="form-label">
+                        <strong>Notes</strong>
+                    </label>
+
+                    <textarea class="form-control"
+                              rows="7"
+                              @bind="ticket.Notes"
+                              placeholder="Add notes about this ticket...">
+                    </textarea>
+
+                </div>
+
+                <div class="mb-3"><label class="form-label"><strong>Link to Active Project</strong></label><select class="form-select" @bind="ticket.ProjectId"><option value="">Not linked to a project</option>@foreach (var project in activeProjects) { <option value="@project.Id">@project.Name</option> }</select><div class="form-text">Only active projects are available.</div></div>
+
+
+                <div class="d-flex gap-2">
+
+                    <button type="button"
+                            class="btn btn-success"
+                            @onclick="SaveChanges">
+
+                        <i class="bi bi-check-lg me-1"></i>
+                        Save Changes
+
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CancelEditing">
+
+                        Cancel
+
+                    </button>
+
+                </div>
+            }
+
+
+            @if (!editing)
+            {
+                <hr class="mt-4" />
+
+                <!-- Actions -->
+                <div class="d-flex justify-content-between align-items-center">
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="GoBack">
+
+                        <i class="bi bi-arrow-left me-1"></i>
+                        Back to Tickets
+
+                    </button>
+
+
+                    <div class="d-flex gap-2">
+
+                        @if (ticket.Status == "Open")
+                        {
+                            <button type="button"
+                                    class="btn btn-success"
+                                    @onclick="CloseTicket">
+
+                                <i class="bi bi-check-circle me-1"></i>
+                                Close Ticket
+
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="button"
+                                    class="btn btn-outline-success"
+                                    @onclick="ReopenTicket">
+
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>
+                                Reopen Ticket
+
+                            </button>
+                        }
+
+
+                        <button type="button"
+                                class="btn btn-danger"
+                                @onclick="DeleteTicket">
+
+                            <i class="bi bi-trash me-1"></i>
+                            Delete Ticket
+
+                        </button>
+
+                    </div>
+
+                </div>
+            }
+
+        </div>
+
+    </div>
+
+
+    <!-- Close Confirmation -->
+    @if (ticketToClose)
+    {
+        <div class="card mt-4 border-success">
+
+            <div class="card-header bg-success text-white">
+                <strong>Close Ticket</strong>
+            </div>
+
+            <div class="card-body">
+
+                <p class="mb-3">
+                    Are you sure you want to close
+                    ticket #@(string.IsNullOrWhiteSpace(ticket.TicketReference) ? $"#{ticket.TicketNumber}" : ticket.TicketReference)?
+                </p>
+
+                <button type="button"
+                        class="btn btn-success me-2"
+                        @onclick="ConfirmClose">
+
+                    Yes, Close Ticket
+
+                </button>
+
+                <button type="button"
+                        class="btn btn-secondary"
+                        @onclick="CancelClose">
+
+                    Cancel
+
+                </button>
+
+            </div>
+
+        </div>
+    }
+
+
+    <!-- Delete Confirmation -->
+    @if (ticketToDelete)
+    {
+        <div class="card mt-4 border-danger">
+
+            <div class="card-header bg-danger text-white">
+                <strong>Delete Ticket</strong>
+            </div>
+
+            <div class="card-body">
+
+                <p class="mb-3">
+                    Are you sure you want to permanently delete
+                    ticket #@(string.IsNullOrWhiteSpace(ticket.TicketReference) ? $"#{ticket.TicketNumber}" : ticket.TicketReference)?
+                </p>
+
+                <button type="button"
+                        class="btn btn-danger me-2"
+                        @onclick="ConfirmDelete">
+
+                    Yes, Delete Ticket
+
+                </button>
+
+                <button type="button"
+                        class="btn btn-secondary"
+                        @onclick="CancelDelete">
+
+                    Cancel
+
+                </button>
+
+            </div>
+
+        </div>
+    }
+}
+
+
+@code
+{
+    [Parameter]
+    public int TicketNumber { get; set; }
+
+    private static readonly string[] EgtaOptions = ["CDS Exports", "CDS Imports", "eCustoms Brokerage", "eCustoms Portal", "EMCS", "ENS", "GVMS", "Send to Brokerage", "Send to TransitNet", "TransitNet", "Shipments"]; private TicketModel? ticket;
+
+    private bool editing = false;
+
+    private TicketModel? originalTicket;
+
+    private bool settingsLoaded = false;
+
+    private bool ticketToClose = false;
+
+    private bool ticketToDelete = false;
+
+    private string replyBody = string.Empty;
+
+    private List<string> supportUsers = new();
+    private List<string> chambers = new();
+    private List<Project> activeProjects = new();
+    private List<ExistingCustomer> existingCustomers = new();
+    private IEnumerable<ExistingCustomer> MatchingExistingCustomers => ticket is null
+        ? []
+        : existingCustomers.Where(customer => OnboardingProductCatalog.Parse(customer.ProductsPurchased).Products
+            .Any(product => string.Equals(product, ticket.Category, StringComparison.OrdinalIgnoreCase)));
+
+    private void CategoryChanged()
+    {
+        if (ticket is null || ticket.ExistingCustomerId is not int selectedCustomerId)
+        {
+            return;
+        }
+
+        if (!MatchingExistingCustomers.Any(customer => customer.Id == selectedCustomerId))
+        {
+            ticket.ExistingCustomerId = null;
+        }
+    }
+    private Project? linkedProject;
+    private IEnumerable<(string Label, string Value)> AdditionalDetails => ticket is null
+        ? []
+        : ticket.GetType().GetProperties()
+            .Where(property => property.Name is not "TicketNumber" and not "TicketReference" and not "Description" and not "Priority" and not "Status" and not "CreatedDate" and not "Notes" and not "Category" and not "ChamberOfCommerce" and not "AssignedTo" and not "ProjectId" and not "EmailMessages")
+            .Select(property => new { Property = property, Value = property.GetValue(ticket) })
+            .Where(item => item.Value is not null && !string.IsNullOrWhiteSpace(item.Value.ToString()))
+            .Select(item => (ToLabel(item.Property.Name), item.Value is DateTime date ? date.ToString("dd/MM/yyyy HH:mm") : item.Value!.ToString()!));
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TicketService.LoadAsync();
+
+        ticket = TicketService
+            .GetTickets()
+            .FirstOrDefault(
+                t => t.TicketNumber == TicketNumber);
+
+        supportUsers = await TicketService.GetAssignableUserDisplayNamesAsync();
+        chambers = await ChamberService.GetNamesAsync();
+        activeProjects = await ProjectService.GetActiveProjectsAsync();
+        existingCustomers = await ExistingCustomerService.GetAllAsync();
+        if (ticket?.ProjectId is int projectId)
+        {
+            linkedProject = await ProjectService.GetAsync(projectId);
+        }
+    }
+
+
+    protected override async Task OnAfterRenderAsync(
+        bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await SettingsService.LoadAsync();
+
+        settingsLoaded = true;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+
+    private bool IsEgtaSelected(string option)=>ticket?.SoftwareModule.Split(";", StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries).Contains(option) == true; private void ToggleEgtaOption(string option){if(ticket is null)return;var values=ticket.SoftwareModule.Split(";", StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries).ToHashSet();if(!values.Add(option))values.Remove(option);ticket.SoftwareModule=string.Join("; ",EgtaOptions.Where(values.Contains));} private void StartEditing()
+    {
+        if (ticket == null)
+        {
+            return;
+        }
+
+        originalTicket = new TicketModel
+        {
+            TicketNumber = ticket.TicketNumber,
+            Description = ticket.Description,
+            Priority = ticket.Priority,
+            Status = ticket.Status,
+            CreatedDate = ticket.CreatedDate,
+            Notes = ticket.Notes,
+            Category = ticket.Category,
+            AssignedTo = ticket.AssignedTo, ExistingCustomerId = ticket.ExistingCustomerId, MainIssue = ticket.MainIssue, AdditionalDetails = ticket.AdditionalDetails, ReferencesLrn = ticket.ReferencesLrn, MainContact = ticket.MainContact, ActionsTaken = ticket.ActionsTaken, SoftwareModule = ticket.SoftwareModule, Mrn = ticket.Mrn, Arc = ticket.Arc, Tsn = ticket.Tsn, ShipmentReference = ticket.ShipmentReference
+            , ProjectId = ticket.ProjectId
+        };
+
+        editing = true;
+    }
+
+
+    private async Task SaveChanges()
+    {
+        if (ticket == null)
+        {
+            return;
+        }
+
+        await TicketService.UpdateTicketAsync(ticket);
+
+        editing = false;
+
+        originalTicket = null;
+    }
+
+
+    private void CancelEditing()
+    {
+        if (ticket == null ||
+            originalTicket == null)
+        {
+            editing = false;
+            return;
+        }
+
+        ticket.Description =
+            originalTicket.Description;
+
+        ticket.Priority =
+            originalTicket.Priority;
+
+        ticket.ProjectId = originalTicket.ProjectId;
+
+        ticket.Status =
+            originalTicket.Status;
+
+        ticket.Notes =
+            originalTicket.Notes;
+
+        ticket.Category =
+            originalTicket.Category;
+
+        ticket.AssignedTo =
+            originalTicket.AssignedTo;
+        ticket.ExistingCustomerId = originalTicket.ExistingCustomerId;
+        ticket.MainIssue = originalTicket.MainIssue;
+        ticket.AdditionalDetails = originalTicket.AdditionalDetails;
+        ticket.ReferencesLrn = originalTicket.ReferencesLrn;
+        ticket.MainContact = originalTicket.MainContact;
+        ticket.ActionsTaken = originalTicket.ActionsTaken;
+        ticket.SoftwareModule = originalTicket.SoftwareModule; ticket.Mrn = originalTicket.Mrn; ticket.Arc = originalTicket.Arc; ticket.Tsn = originalTicket.Tsn; ticket.ShipmentReference = originalTicket.ShipmentReference;
+
+        editing = false;
+
+        originalTicket = null;
+    }
+
+
+    private async Task CloseTicket()
+    {
+        if (ticket == null)
+        {
+            return;
+        }
+
+        if (!settingsLoaded)
+        {
+            return;
+        }
+
+        if (SettingsService.Current.ConfirmClose)
+        {
+            ticketToClose = true;
+            return;
+        }
+
+        await PerformClose();
+    }
+
+
+    private async Task ConfirmClose()
+    {
+        ticketToClose = false;
+
+        await PerformClose();
+    }
+
+
+    private async Task PerformClose()
+    {
+        if (ticket == null)
+        {
+            return;
+        }
+
+        await TicketService.CloseTicketAsync(
+            ticket.TicketNumber);
+
+        ticket.Status = "Closed";
+    }
+
+
+    private void CancelClose()
+    {
+        ticketToClose = false;
+    }
+
+
+    private async Task ReopenTicket()
+    {
+        if (ticket == null)
+        {
+            return;
+        }
+
+        ticket.Status = "Open";
+
+        await TicketService.SaveTicketsAsync();
+    }
+
+
+    private async Task DeleteTicket()
+    {
+        if (ticket == null)
+        {
+            return;
+        }
+
+        if (!settingsLoaded)
+        {
+            return;
+        }
+
+        if (SettingsService.Current.ConfirmDelete)
+        {
+            ticketToDelete = true;
+            return;
+        }
+
+        await PerformDelete();
+    }
+
+
+    private async Task ConfirmDelete()
+    {
+        ticketToDelete = false;
+
+        await PerformDelete();
+    }
+
+
+    private async Task PerformDelete()
+    {
+        if (ticket == null)
+        {
+            return;
+        }
+
+        var returnUrl = ticket.Status == "Closed"
+            ? "closedtickets"
+            : "opentickets";
+
+        await TicketService.DeleteTicketAsync(
+            ticket.TicketNumber);
+
+        Navigation.NavigateTo(returnUrl);
+    }
+
+
+    private void CancelDelete()
+    {
+        ticketToDelete = false;
+    }
+
+
+    private void GoBack()
+    {
+        if (ticket?.Status == "Closed")
+        {
+            Navigation.NavigateTo("closedtickets");
+        }
+        else
+        {
+            Navigation.NavigateTo("opentickets");
+        }
+    }
+
+    private static string ToLabel(string value) => System.Text.RegularExpressions.Regex.Replace(value, "([a-z])([A-Z])", "$1 $2");
+
+    private async Task SendReplyAsync()
+    {
+        if (ticket is null || string.IsNullOrWhiteSpace(replyBody))
+        {
+            return;
+        }
+
+        await TicketService.AddEmailReplyAsync(
+            ticket.TicketNumber,
+            string.IsNullOrWhiteSpace(ticket.AssignedTo)
+                ? "Support"
+                : ticket.AssignedTo,
+            replyBody.Trim());
+
+        replyBody = string.Empty;
+        await TicketService.LoadAsync();
+        ticket = TicketService.GetTickets()
+            .FirstOrDefault(item => item.TicketNumber == TicketNumber);
+    }
+}
+
+
+
+

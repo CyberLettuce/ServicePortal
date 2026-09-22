@@ -1,0 +1,174 @@
+@page "/Account/Login"
+@model ServicePortal.Pages.Account.LoginModel
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Sign In - SGS Service Portal</title>
+
+    <link rel="stylesheet"
+          href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
+
+    <link rel="stylesheet"
+          href="~/app.css" />
+
+    <style>
+        :root { color-scheme: light; }
+        body { min-height: 100vh; margin: 0; background: #fff; color: #172033; font-family: "DM Sans", Arial, sans-serif; }
+        .login-page { min-height: 100vh; display: grid; grid-template-columns: minmax(360px, 43%) 1fr; }
+        .login-brand-panel { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; min-height: 100vh; padding: 56px clamp(36px, 6vw, 92px); color: #fff; background: radial-gradient(circle at 10% 88%, #ff8a09 0, transparent 29%), radial-gradient(circle at 105% 8%, #ffac24 0, transparent 35%), linear-gradient(144deg, #652708 0%, #aa470c 45%, #2a1d1a 100%); }
+        .login-brand-panel::before, .login-brand-panel::after { content: ""; position: absolute; pointer-events: none; border-radius: 50%; transform: rotate(-27deg); }
+        .login-brand-panel::before { width: 125%; height: 36%; left: -35%; top: 38%; border: 2px solid #ffca6778; box-shadow: 0 0 0 42px #ff8e0f22, 0 0 0 108px #f16d0e1c; }
+        .login-brand-panel::after { width: 130%; height: 43%; right: -70%; bottom: -8%; border: 38px solid #ff870b52; box-shadow: 0 -12px 30px #ffbb3c80; }
+        .brand-lockup, .brand-focus, .brand-tagline { position: relative; z-index: 1; }
+        .brand-mark { width: 78px; height: 78px; display: grid; place-items: center; padding: 5px; border: 1px solid #ffcc84; background: #fff; }.brand-mark img { width: 100%; height: 100%; object-fit: contain; }
+        .brand-focus h1 { margin: 0 0 9px; font-size: clamp(36px, 3.4vw, 52px); font-weight: 800; line-height: .95; letter-spacing: -1.5px; }.brand-focus p { margin: 0; font-size: clamp(24px, 2.35vw, 35px); font-weight: 300; }.brand-rule { width: 48px; height: 4px; margin: 40px 0 20px; background: #ff922c; }.brand-keywords { margin: 0; color: #ffe0b0; font-size: 12px; font-weight: 700; line-height: 1.85; letter-spacing: .27em; }.brand-tagline { margin: 0; font-size: 15px; font-weight: 500; }
+        .login-form-panel { display: flex; align-items: center; justify-content: center; padding: 48px 24px; background: #fff; }.login-container { width: 100%; max-width: 520px; }.login-heading { margin-bottom: 34px; }.login-heading h2 { margin: 0 0 8px; font-size: clamp(30px, 3.2vw, 46px); font-weight: 800; letter-spacing: -1.2px; }.login-heading p { margin: 0; color: #637087; font-size: 18px; }.form-label { font-weight: 700; color: #3d4658; }.form-control { min-height: 58px; padding: 0 16px; border: 1px solid #cfd7e2; border-radius: 10px; font-size: 16px; }.form-control:focus { border-color: #f58220; box-shadow: 0 0 0 .2rem #f5822030; }.password-wrapper { position: relative; }.password-wrapper .form-control { padding-right: 50px; }.password-toggle { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); border: none; background: transparent; color: #5f6c80; cursor: pointer; }.login-options { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 22px 0 30px; }.login-options a { color: #db5700; font-weight: 700; }.login-button { width: 100%; min-height: 58px; border: 0; border-radius: 10px; background: #ef6500; color: #fff; font-size: 18px; font-weight: 800; }.login-button:hover { background: #cf5100; }.validation-summary { margin-bottom: 20px; }
+        @@media (max-width: 850px) { .login-page { display: block; }.login-brand-panel { min-height: auto; padding: 30px; }.brand-focus { display: none; }.brand-tagline { margin-top: 42px; }.login-form-panel { min-height: calc(100vh - 180px); padding: 48px 28px; } }
+    </style>
+</head>
+
+<body>
+
+<div class="login-page">
+    <aside class="login-brand-panel" aria-label="SGS Service Portal">
+        <div class="brand-lockup"><div class="brand-mark"><img src="~/SGS.png" alt="SGS" /></div></div>
+        <div class="brand-focus"><h1>SGS</h1><p>Service Portal</p><div class="brand-rule"></div><p class="brand-keywords">HELPDESK<br />PROJECTS<br />SUPPORT<br />TESTING</p></div>
+        <p class="brand-tagline">SGS. When you need to be sure.</p>
+    </aside>
+    <main class="login-form-panel">
+        <div class="login-container">
+            <div class="login-heading"><h2>Welcome back</h2><p>Sign in to continue to your workspace.</p></div>
+
+            <form method="post" asp-antiforgery="true">
+
+                <input type="hidden"
+                       name="ReturnUrl"
+                       value="@Model.ReturnUrl" />
+
+<div asp-validation-summary="ModelOnly"
+     class="text-danger validation-summary"
+     role="alert">
+</div>
+
+                <div class="mb-3">
+
+                    <label asp-for="Login"
+                           class="form-label">
+                        Email address or username
+                    </label>
+
+                    <input asp-for="Login"
+                           class="form-control"
+                           autocomplete="username"
+                           placeholder="Enter your email address or username" />
+
+                    <span asp-validation-for="Login"
+                          class="text-danger">
+                    </span>
+
+                </div>
+
+                <div class="mb-3">
+
+                    <label asp-for="Password"
+                           class="form-label">
+                        Password
+                    </label>
+
+                    <div class="password-wrapper">
+
+                        <input asp-for="Password"
+                               id="password"
+                               class="form-control"
+                               autocomplete="current-password"
+                               placeholder="Enter your password" />
+
+                        <button type="button"
+                                class="password-toggle"
+                                onclick="togglePassword()"
+                                aria-label="Show password">
+
+                            <i id="passwordIcon"
+                               class="bi bi-eye">
+                            </i>
+
+                        </button>
+
+                    </div>
+
+                    <span asp-validation-for="Password"
+                          class="text-danger">
+                    </span>
+
+                </div>
+
+                <div class="login-options">
+                    <div class="form-check mb-0">
+
+                    <input asp-for="RememberMe"
+                           class="form-check-input" />
+
+                    <label asp-for="RememberMe"
+                           class="form-check-label">
+                        Remember me
+                    </label>
+
+                    </div>
+                    <a href="mailto:ecustoms.uk@sgs.com">Need help?</a>
+                </div>
+
+                <button type="submit"
+                        class="btn btn-primary login-button">
+
+                    <i class="bi bi-box-arrow-in-right me-2"></i>
+                    Sign in <i class="bi bi-arrow-right ms-2"></i>
+
+                </button>
+
+            </form>
+
+        </div>
+    </main>
+</div>
+
+<script>
+    function togglePassword() {
+
+        const password = document.getElementById("password");
+        const icon = document.getElementById("passwordIcon");
+
+        if (password.type === "password") {
+
+            password.type = "text";
+
+            icon.classList.remove("bi-eye");
+            icon.classList.add("bi-eye-slash");
+
+        } else {
+
+            password.type = "password";
+
+            icon.classList.remove("bi-eye-slash");
+            icon.classList.add("bi-eye");
+
+        }
+    }
+</script>
+
+</body>
+</html>

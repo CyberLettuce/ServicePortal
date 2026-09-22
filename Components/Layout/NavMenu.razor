@@ -1,0 +1,208 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@using ServicePortal.Services
+
+@inject SettingsService SettingsService
+
+<input type="checkbox"
+       title="Toggle navigation menu"
+       aria-label="Toggle navigation menu"
+       class="navbar-toggler" />
+
+<div class="sidebar-header">
+    <div class="brand-mark">
+        <img src="brand-image" alt="Service Portal" />
+    </div>
+    <div class="brand-copy">
+        <span class="brand-title">Service Portal</span>
+        <span class="brand-subtitle">SGS</span>
+    </div>
+</div>
+
+<div class="nav-scrollable">
+    <nav class="sidebar-navigation" aria-label="Main navigation">
+        <div class="nav-section">
+            <div class="nav-section-title">Overview</div>
+
+            <div class="nav-item">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="bi bi-grid" aria-hidden="true"></span>
+                    <span>Dashboard</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-item">
+                <NavLink class="nav-link" href="reports">
+                    <span class="bi bi-bar-chart-line" aria-hidden="true"></span>
+                    <span>Reports</span>
+                </NavLink>
+            </div>
+        </div>
+
+        <AuthorizeView Policy="TicketsModule">
+            <Authorized>
+                <div class="nav-section">
+                    <div class="nav-section-title">Support Tickets</div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="opentickets">
+                            <span class="bi bi-inbox" aria-hidden="true"></span>
+                            <span>Open Tickets</span>
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="closedtickets">
+                            <span class="bi bi-check2-circle" aria-hidden="true"></span>
+                            <span>Closed Tickets</span>
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="knowledge-base">
+                            <span class="bi bi-book" aria-hidden="true"></span>
+                            <span>Knowledge Base</span>
+                        </NavLink>
+                    </div>
+
+                    <AuthorizeView Policy="SupportOrAdministrator"><Authorized Context="templateAuthorization"><div class="nav-item">
+                        <NavLink class="nav-link" href="ticket-templates">
+                            <span class="bi bi-file-earmark-text" aria-hidden="true"></span>
+                            <span>Ticket Templates</span>
+                        </NavLink>
+                    </div></Authorized></AuthorizeView>
+
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="OnboardingModule">
+            <Authorized>
+                <div class="nav-section">
+                    <div class="nav-section-title">Onboarding</div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="onboarding">
+                            <span class="bi bi-person-check" aria-hidden="true"></span>
+                            <span>Current Onboarding</span>
+                        </NavLink>
+                    </div>
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="existing-customers">
+                            <span class="bi bi-buildings" aria-hidden="true"></span>
+                            <span>Existing Customers</span>
+                        </NavLink>
+                    </div>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="TestingModule">
+            <Authorized>
+                <div class="nav-section">
+                    <div class="nav-section-title">Quality Assurance</div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="testing" Match="NavLinkMatch.All">
+                            <span class="bi bi-clipboard2-check" aria-hidden="true"></span>
+                            <span>Current Testing</span>
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="testing/history">
+                            <span class="bi bi-clock-history" aria-hidden="true"></span>
+                            <span>Previous Months</span>
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="testing/repository">
+                            <span class="bi bi-journal-check" aria-hidden="true"></span>
+                            <span>Test Case Repository</span>
+                        </NavLink>
+                    </div>
+
+                    <AuthorizeView Policy="AdministratorOnly"><Authorized Context="automationContext">
+                        <div class="nav-item"><NavLink class="nav-link" href="testing/automation/ecert"><span class="bi bi-play-circle" aria-hidden="true"></span><span>Automated Testing: eCERT</span></NavLink></div>
+                        <div class="nav-item"><NavLink class="nav-link" href="testing/automation/egta"><span class="bi bi-play-circle" aria-hidden="true"></span><span>Automated Testing: eGTA</span></NavLink></div>
+                        <div class="nav-item"><NavLink class="nav-link" href="testing/automation/ukcs"><span class="bi bi-play-circle" aria-hidden="true"></span><span>Automated Testing: UKCS Portal</span></NavLink></div>
+                    </Authorized></AuthorizeView>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="ProjectsModule">
+            <Authorized>
+                <div class="nav-section">
+                    <div class="nav-section-title">Projects</div>
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="projects">
+                            <span class="bi bi-kanban" aria-hidden="true"></span>
+                            <span>All Projects</span>
+                        </NavLink>
+                    </div>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="AdministratorOnly">
+            <Authorized>
+                <div class="nav-section">
+                    <div class="nav-section-title">Administration</div>
+
+                    <div class="nav-item">
+                        <NavLink class="nav-link" href="users">
+                            <span class="bi bi-people" aria-hidden="true"></span>
+                            <span>Users</span>
+                        </NavLink>
+                    </div>
+
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="SupportOrAdministrator">
+            <Authorized>
+                <div class="nav-section">
+                    <div class="nav-section-title">Auditing</div>
+                    <div class="nav-item"><NavLink class="nav-link" href="audit-log"><span class="bi bi-clock-history" aria-hidden="true"></span><span>Audit Log</span></NavLink></div>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+        <div class="nav-section account-section">
+            <div class="nav-section-title">Account</div>
+
+            <div class="nav-item">
+                <NavLink class="nav-link" href="settings">
+                    <span class="bi bi-gear" aria-hidden="true"></span>
+                    <span>Settings</span>
+                </NavLink>
+            </div>
+
+
+        </div>
+    </nav>
+</div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await SettingsService.LoadAsync();
+        await SettingsService.ApplyAppearanceAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+
+}
+
+
+
+
+

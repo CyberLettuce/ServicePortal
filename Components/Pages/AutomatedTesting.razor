@@ -1,0 +1,102 @@
+@page "/testing/automation"
+@page "/testing/automation/{Product}"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using ServicePortal.Data
+@using ServicePortal.Services
+@attribute [Authorize(Policy = "AdministratorOnly")]
+@inject AutomationRunnerService AutomationRunnerService
+@inject BrowserTestService BrowserTestService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageHeader Title="Automated Testing" Description="Choose a product and run its browser login check.">
+    <Actions><a class="btn btn-outline-primary" href="testing">Current Testing</a></Actions>
+</PageHeader>
+
+<div class="card mb-4"><div class="card-body d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-primary" href="testing/automation/ecert">eCERT</a>
+    <a class="btn btn-outline-primary" href="testing/automation/egta">eGTA</a>
+    <a class="btn btn-outline-primary" href="testing/automation/ukcs">UKCS Portal</a>
+    <a class="btn btn-outline-primary" href="testing/automation/builder"><i class="bi bi-diagram-3 me-1"></i>Test Builder</a>
+</div></div>
+
+<div class="card"><div class="card-header"><strong><i class="bi bi-play-circle me-2"></i>@ProductName login check</strong></div><div class="card-body">
+    <p class="text-muted">Enter a test login address and account. The supplied credentials are used only for this run.</p>
+    <div class="row g-3">
+        <div class="col-12"><label class="form-label">Login URL</label><input class="form-control" @bind="url" placeholder="https://…" /></div>
+        <div class="col-md-6"><label class="form-label">Test email</label><input class="form-control" @bind="email" /></div>
+        <div class="col-md-6"><label class="form-label">Test password</label><input class="form-control" type="password" @bind="password" /></div>
+    </div>
+    <div class="form-check mt-3"><input class="form-check-input" type="checkbox" @bind="showBrowser" /><label class="form-check-label">Show browser while running</label></div>
+    <button type="button" class="btn btn-primary mt-3" disabled="@isRunning" @onclick="RunAsync">@(isRunning ? "Running check…" : "Run login check")</button>
+    @if (result is not null)
+    {
+        <div class="alert @(result.Succeeded ? "alert-success" : "alert-danger") mt-3 mb-0"><strong>@result.Summary</strong><div class="mt-1">@result.Output</div></div>
+    }
+</div></div>
+
+<div class="card mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong><i class="bi bi-diagram-3 me-2"></i>Saved browser tests</strong>
+        <a class="btn btn-sm btn-outline-primary" href="testing/automation/builder">Open Test Builder</a>
+    </div>
+    <div class="list-group list-group-flush">
+        @if (savedTests.Count == 0)
+        {
+            <div class="list-group-item text-muted">No saved @ProductName browser tests yet.</div>
+        }
+        @foreach (var test in savedTests)
+        {
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start gap-3">
+                    <div><strong>@test.Name</strong><div class="small text-muted">@test.Steps.Count step@(test.Steps.Count == 1 ? "" : "s") · @test.StartUrl</div></div>
+                    <button type="button" class="btn btn-sm btn-primary" disabled="@isRunning" @onclick="() => RunSavedAsync(test)"><i class="bi bi-play-fill me-1"></i>Run test</button>
+                </div>
+                @if (savedResults.TryGetValue(test.Id, out var savedResult))
+                {
+                    <div class="alert @(savedResult.Succeeded ? "alert-success" : "alert-danger") mt-3 mb-0"><strong>@savedResult.Summary</strong><div class="mt-1">@savedResult.Output</div><details class="mt-2"><summary>Technical details</summary><pre class="small text-wrap mb-0 mt-2">@savedResult.TechnicalOutput</pre></details></div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? Product { get; set; }
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private string url = string.Empty;
+    private bool showBrowser = true;
+    private bool isRunning;
+    private AutomationRunResult? result;
+    private List<BrowserTest> savedTests = [];
+    private readonly Dictionary<int, AutomationRunResult> savedResults = new();
+    private string startedBy = "Unknown";
+    private string ProductName => Product?.ToLowerInvariant() switch { "egta" => "eGTA", "ukcs" or "ukcs-portal" => "UKCS Portal", _ => "eCERT" };
+    protected override async Task OnParametersSetAsync()
+    {
+        var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        startedBy = authentication.User.FindFirstValue(ClaimTypes.Name) ?? authentication.User.Identity?.Name ?? "Unknown";
+        url = ProductName == "eCERT" ? "https://test-ecert.sgs.net/uk/customer-login/" : string.Empty;
+        result = null;
+        savedTests = (await BrowserTestService.GetTestsAsync())
+            .Where(test => string.Equals(test.Product, ProductName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+    private async Task RunAsync()
+    {
+        isRunning = true;
+        try { result = await AutomationRunnerService.RunLoginAsync(ProductName, ProductName, url, email, password, showBrowser, startedBy); }
+        catch { result = new(false, "The test runner could not complete the check.", string.Empty); }
+        finally { password = string.Empty; isRunning = false; }
+    }
+    private async Task RunSavedAsync(BrowserTest test)
+    {
+        isRunning = true;
+        try { savedResults[test.Id] = await AutomationRunnerService.RunBrowserTestAsync(test, showBrowser, startedBy); }
+        catch { savedResults[test.Id] = new(false, "The saved test runner could not complete the test.", string.Empty); }
+        finally { isRunning = false; }
+    }
+}

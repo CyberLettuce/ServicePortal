@@ -1,0 +1,95 @@
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<div class="rich-text-editor">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <label class="form-label">@Label</label>
+    }
+    <div class="rich-text-toolbar" role="toolbar" aria-label="Text formatting">
+        <button type="button" class="btn btn-sm btn-outline-secondary" title="Bold" @onclick='() => FormatAsync("bold")'><i class="bi bi-type-bold"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" title="Italic" @onclick='() => FormatAsync("italic")'><i class="bi bi-type-italic"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" title="Underline" @onclick='() => FormatAsync("underline")'><i class="bi bi-type-underline"></i></button>
+        <span class="rich-text-divider"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" title="Heading" @onclick='() => FormatAsync("formatBlock", "H3")'><i class="bi bi-type-h3"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" title="Paragraph" @onclick='() => FormatAsync("formatBlock", "P")'><i class="bi bi-text-paragraph"></i></button>
+        <span class="rich-text-divider"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" title="Bullet list" @onclick='() => FormatAsync("insertUnorderedList")'><i class="bi bi-list-ul"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" title="Numbered list" @onclick='() => FormatAsync("insertOrderedList")'><i class="bi bi-list-ol"></i></button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" title="Add link" @onclick="LinkAsync"><i class="bi bi-link-45deg"></i></button>
+        <span class="rich-text-divider"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" title="Clear formatting" @onclick='() => FormatAsync("removeFormat")'><i class="bi bi-eraser"></i></button>
+        @if (EnableComments)
+        {
+            <span class="rich-text-divider"></span>
+            <button type="button" class="btn btn-sm btn-outline-primary" title="Add a dated comment" @onclick="AddCommentAsync"><i class="bi bi-chat-left-text me-1"></i>Add comment</button>
+        }
+    </div>
+    <div id="@editorId" class="form-control rich-text-content" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="@Placeholder" @onblur="CaptureValueAsync"></div>
+</div>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool EnableComments { get; set; }
+    [Parameter] public string? CommentAuthor { get; set; }
+
+    private readonly string editorId = "rich-text-" + Guid.NewGuid().ToString("N");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("helpdeskRichText.setValue", editorId, Value ?? string.Empty);
+        }
+    }
+
+    private async Task FormatAsync(string command, string? value = null)
+    {
+        await JS.InvokeVoidAsync("helpdeskRichText.format", editorId, command, value);
+        await CaptureValueAsync();
+    }
+
+    private async Task LinkAsync()
+    {
+        await JS.InvokeVoidAsync("helpdeskRichText.addLink", editorId);
+        await CaptureValueAsync();
+    }
+
+    private async Task AddCommentAsync()
+    {
+        var author = string.IsNullOrWhiteSpace(CommentAuthor) ? "Unknown user" : CommentAuthor.Trim();
+        var timestamp = FormatEditedStamp(DateTime.UtcNow, author);
+        var heading = System.Net.WebUtility.HtmlEncode(timestamp);
+        await JS.InvokeVoidAsync("helpdeskRichText.addComment", editorId, heading);
+    }
+
+    private static string FormatEditedStamp(DateTime timestamp, string author)
+    {
+        var utcTimestamp = DateTime.SpecifyKind(timestamp, DateTimeKind.Utc);
+        TimeZoneInfo london;
+        try
+        {
+            london = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            london = TimeZoneInfo.FindSystemTimeZoneById("Europe/London");
+        }
+
+        var localTimestamp = TimeZoneInfo.ConvertTimeFromUtc(utcTimestamp, london);
+        var offset = london.GetUtcOffset(localTimestamp);
+        var offsetText = $"UTC{(offset < TimeSpan.Zero ? "-" : "+")}{Math.Abs(offset.Hours)}";
+        return $"Edited by {author} on {localTimestamp:dd MMMM yyyy} at {localTimestamp:HH:mm} ({offsetText})";
+    }
+
+    private async Task CaptureValueAsync()
+    {
+        var value = await JS.InvokeAsync<string>("helpdeskRichText.getValue", editorId);
+        if (value != (Value ?? string.Empty)) await ValueChanged.InvokeAsync(value);
+    }
+}
+

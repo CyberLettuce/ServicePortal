@@ -1,0 +1,10 @@
+<div class="software-owner-selector">@foreach (var owner in Owners) { <label class="form-check form-check-inline"><input class="form-check-input" type="checkbox" checked="@selected.Contains(owner)" @onchange="args => ToggleAsync(owner, args)" /><span class="form-check-label">@owner</span></label> }</div>
+@code {
+ [Parameter] public string Value { get; set; } = string.Empty;
+ [Parameter] public EventCallback<string> ValueChanged { get; set; }
+ private readonly string[] Owners = ["Ben Lear", "Gary Livermore", "Ian James", "Simon Breeze"];
+ private HashSet<string> selected = new(StringComparer.OrdinalIgnoreCase);
+ private string lastValue = string.Empty;
+ protected override void OnParametersSet() { if (Value == lastValue) return; lastValue = Value; selected = Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.OrdinalIgnoreCase); }
+ private async Task ToggleAsync(string owner, ChangeEventArgs args) { if (args.Value is true) selected.Add(owner); else selected.Remove(owner); Value = string.Join(", ", Owners.Where(selected.Contains)); lastValue = Value; await ValueChanged.InvokeAsync(Value); }
+}

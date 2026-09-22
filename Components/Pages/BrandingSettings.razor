@@ -1,0 +1,43 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Authorization
+@using ServicePortal.Services
+@attribute [Authorize(Policy = "AdministratorOnly")]
+@inject BrandingService BrandingService
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header"><h5 class="mb-0">Portal branding</h5></div>
+    <div class="card-body">
+        <label class="form-label fw-semibold">Navigation logo</label>
+        <InputFile class="form-control" accept="image/png,image/jpeg,image/webp" OnChange="UploadLogoAsync" />
+        <div class="form-text">PNG, JPG, or WebP, up to 2 MB. This replaces the logo in the navigation for every user.</div>
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="alert @messageClass mt-3 mb-0">@message</div>
+        }
+    </div>
+</div>
+
+@code {
+    private string message = string.Empty;
+    private string messageClass = "alert-success";
+
+    private async Task UploadLogoAsync(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (file.Size > 2 * 1024 * 1024 || extension is not ".png" and not ".jpg" and not ".jpeg" and not ".webp")
+        {
+            message = "Choose a PNG, JPG, or WebP image up to 2 MB.";
+            messageClass = "alert-danger";
+            return;
+        }
+
+        await using var input = file.OpenReadStream(2 * 1024 * 1024);
+        using var memory = new MemoryStream();
+        await input.CopyToAsync(memory);
+        var contentType = extension == ".png" ? "image/png" : extension == ".webp" ? "image/webp" : "image/jpeg";
+        await BrandingService.SaveLogoAsync(memory.ToArray(), contentType);
+        message = "Navigation logo saved. Refresh the page to see it.";
+        messageClass = "alert-success";
+    }
+}

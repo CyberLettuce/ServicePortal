@@ -1,0 +1,32 @@
+.onboarding-product-fields {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid #dfe5ec;
+    border-radius: 0.75rem;
+    background: #f8fafc;
+}
+
+.onboarding-product-fields-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.onboarding-product-fields-heading > .bi {
+    width: 2.35rem;
+    height: 2.35rem;
+    display: grid;
+    place-items: center;
+    flex: 0 0 2.35rem;
+    border-radius: 0.6rem;
+    color: #ffffff;
+    background: #198754;
+    font-size: 1.05rem;
+}
+
+html.dark-mode .onboarding-product-fields {
+    color: #eef2f6;
+    background: #232930;
+    border-color: #414b57;
+}

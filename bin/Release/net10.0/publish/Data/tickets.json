@@ -1,0 +1,16 @@
+[
+  {
+    "TicketNumber": 1,
+    "Description": "Test Helpdesk ticket #1",
+    "Priority": "Medium",
+    "Status": "Open",
+    "CreatedDate": "2026-09-16T09:32:49.6218306+01:00",
+    "Notes": "",
+    "Category": "eCERT",
+    "AssignedTo": "Ben",
+    "RequesterName": "",
+    "RequesterEmail": "",
+    "EmailSubject": "",
+    "EmailMessages": []
+  }
+]

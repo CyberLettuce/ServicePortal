@@ -1,0 +1,59 @@
+.settings-page[b-qat5y3whu9] {
+    max-width: 1100px;
+}
+
+.settings-page .card[b-qat5y3whu9] {
+    border: none;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.settings-page .card-header[b-qat5y3whu9] {
+    background: #f5f5f5;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 1rem 1.25rem;
+}
+
+.settings-page .card-body[b-qat5y3whu9] {
+    padding: 1.5rem 1.25rem;
+}
+
+.settings-page .form-label[b-qat5y3whu9] {
+    margin-bottom: 0.5rem;
+}
+
+.settings-page .form-check-input[b-qat5y3whu9] {
+    width: 3rem;
+    height: 1.5rem;
+    cursor: pointer;
+}
+
+.settings-page .form-select[b-qat5y3whu9],
+.settings-page .form-control[b-qat5y3whu9] {
+    min-height: 42px;
+}
+
+.settings-page .btn-primary[b-qat5y3whu9] {
+    padding: 0.55rem 1.25rem;
+    font-weight: 600;
+}
+
+.settings-page .alert[b-qat5y3whu9] {
+    border-radius: 6px;
+}
+
+.settings-page .card + .card[b-qat5y3whu9] {
+    margin-top: 0;
+}
+
+.settings-page .testing-default-switch[b-qat5y3whu9] {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding-left: 0;
+}
+
+.settings-page .testing-default-switch .form-check-input[b-qat5y3whu9] {
+    flex: 0 0 auto;
+    margin: 0.1rem 0 0;
+}

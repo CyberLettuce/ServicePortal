@@ -1,0 +1,1449 @@
+@page "/users"
+
+@using System.ComponentModel.DataAnnotations
+@using ServicePortal.Data
+@using ServicePortal.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Authorization
+
+@attribute [Authorize(Policy = "AdministratorOnly")]
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+@inject AuditLogService AuditLogService
+@inject ModuleAccessService ModuleAccessService
+
+<PageHeader Title="User Management" Description="Manage user access, roles, and modules.">
+    <Actions><button type="button" class="btn btn-primary" @onclick="ShowCreateUser"><i class="bi bi-person-plus me-1"></i>Create User</button></Actions>
+</PageHeader>
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success">
+        @successMessage
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">
+        @errorMessage
+    </div>
+}
+
+@if (showCreateUser)
+{
+<div class="card mt-4">
+    <div class="card-header">
+        <strong>Create user</strong>
+    </div>
+
+    <div class="card-body">
+
+        <EditForm Model="@newUser"
+                  OnValidSubmit="CreateUserAsync">
+
+            <DataAnnotationsValidator />
+
+            <ValidationSummary class="text-danger mb-3" />
+
+            <div class="mb-3">
+                <label class="form-label">
+                    Display name
+                </label>
+
+                <InputText @bind-Value="newUser.DisplayName"
+                           class="form-control"
+                           placeholder="e.g. Ben Lear" />
+
+                <ValidationMessage For="@(() => newUser.DisplayName)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">
+                    Email address
+                </label>
+
+                <InputText @bind-Value="newUser.Email"
+                           class="form-control"
+                           type="email"
+                           placeholder="Enter email address" />
+
+                <ValidationMessage For="@(() => newUser.Email)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">
+                    Password
+                </label>
+
+                <InputText @bind-Value="newUser.Password"
+                           class="form-control"
+                           type="password"
+                           autocomplete="new-password"
+                           placeholder="Enter password" />
+
+                <ValidationMessage For="@(() => newUser.Password)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">
+                    Confirm password
+                </label>
+
+                <InputText @bind-Value="newUser.ConfirmPassword"
+                           class="form-control"
+                           type="password"
+                           autocomplete="new-password"
+                           placeholder="Confirm password" />
+
+                <ValidationMessage For="@(() => newUser.ConfirmPassword)" />
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label">
+                    Role
+                </label>
+
+                <InputSelect @bind-Value="newUser.Role"
+                             class="form-select">
+
+                    <option value="">
+                        Select a role
+                    </option>
+
+                    <option value="Administrator">
+                        Administrator
+                    </option>
+
+                    <option value="Support">
+                        Support
+                    </option>
+
+                    <option value="ReadOnly">
+                        Read Only
+                    </option>
+
+                </InputSelect>
+
+                <ValidationMessage For="@(() => newUser.Role)" />
+            </div>
+
+            <div class="form-check form-switch mb-4">
+                <InputCheckbox @bind-Value="newUser.TicketsModuleEnabled"
+                               class="form-check-input" />
+                <label class="form-check-label">
+                    Support Tickets module
+                </label>
+                <div class="form-text">
+                    Gives this user access to ticket pages and reports.
+                </div>
+            </div>
+
+            <div class="form-check form-switch mb-4">
+                <InputCheckbox @bind-Value="newUser.OnboardingModuleEnabled"
+                               class="form-check-input" />
+                <label class="form-check-label">
+                    Customer Onboarding module
+                </label>
+                <div class="form-text">
+                    Gives this user access to customer onboarding records and checklists.
+                </div>
+            </div>
+
+            <div class="form-check form-switch mb-4">
+                <InputCheckbox @bind-Value="newUser.TestingModuleEnabled" class="form-check-input" />
+                <label class="form-check-label">Testing module</label>
+                <div class="form-text">Gives this user access to testing schedules and results.</div>
+            </div>
+
+            <div class="form-check form-switch mb-4">
+                <InputCheckbox @bind-Value="newUser.ProjectsModuleEnabled" class="form-check-input" />
+                <label class="form-check-label">Projects module</label>
+                <div class="form-text">Gives this user access to project delivery and updates.</div>
+            </div>
+
+            <button type="submit"
+                    class="btn btn-primary"
+                    disabled="@isCreating">
+
+                @if (isCreating)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"
+                          role="status">
+                    </span>
+
+                    <span>Creating...</span>
+                }
+                else
+                {
+                    <i class="bi bi-person-plus me-2"></i>
+                    <span>Create User</span>
+                }
+
+            </button>
+
+        </EditForm>
+
+    </div>
+</div>
+}
+
+<div class="card mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Existing users</strong>
+
+        @if (editingUser is not null)
+{
+    <div class="card mt-4">
+        <div class="card-header">
+            <strong>Edit user</strong>
+        </div>
+
+        <div class="card-body">
+
+            <EditForm Model="@editUserModel"
+                      OnValidSubmit="SaveUserAsync">
+
+                <DataAnnotationsValidator />
+
+                <ValidationSummary class="text-danger mb-3" />
+
+                <div class="mb-3">
+                    <label class="form-label">
+                        Display name
+                    </label>
+
+                    <InputText @bind-Value="editUserModel.DisplayName"
+                               class="form-control" />
+
+                    <ValidationMessage For="@(() => editUserModel.DisplayName)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">
+                        Email address
+                    </label>
+
+                    <input class="form-control"
+                           value="@editingUser.Email"
+                           disabled />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">
+                        Role
+                    </label>
+
+                    <InputSelect @bind-Value="editUserModel.Role"
+                                 class="form-select">
+
+                        <option value="">
+                            Select a role
+                        </option>
+
+                        <option value="Administrator">
+                            Administrator
+                        </option>
+
+                        <option value="Support">
+                            Support
+                        </option>
+
+                        <option value="ReadOnly">
+                            Read Only
+                        </option>
+
+                    </InputSelect>
+
+                    <ValidationMessage For="@(() => editUserModel.Role)" />
+                </div>
+
+                <div class="form-check form-switch mb-4">
+                    <InputCheckbox @bind-Value="editUserModel.TicketsModuleEnabled"
+                                   class="form-check-input" />
+                    <label class="form-check-label">
+                        Support Tickets module
+                    </label>
+                    <div class="form-text">
+                        Controls access to ticket pages and reports.
+                    </div>
+                </div>
+
+                <div class="form-check form-switch mb-4">
+                    <InputCheckbox @bind-Value="editUserModel.OnboardingModuleEnabled"
+                                   class="form-check-input" />
+                    <label class="form-check-label">
+                        Customer Onboarding module
+                    </label>
+                    <div class="form-text">
+                        Controls access to customer onboarding records and checklists.
+                    </div>
+                </div>
+
+                <div class="form-check form-switch mb-4">
+                    <InputCheckbox @bind-Value="editUserModel.TestingModuleEnabled" class="form-check-input" />
+                    <label class="form-check-label">Testing module</label>
+                    <div class="form-text">Controls access to testing schedules and results.</div>
+                </div>
+                <div class="form-check form-switch mb-4">
+                    <InputCheckbox @bind-Value="editUserModel.ProjectsModuleEnabled" class="form-check-input" />
+                    <label class="form-check-label">Projects module</label>
+                    <div class="form-text">Controls access to project delivery and updates.</div>
+                </div>
+
+                <button type="submit"
+                        class="btn btn-primary me-2"
+                        disabled="@isSavingUser">
+
+                    @if (isSavingUser)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"
+                              role="status">
+                        </span>
+
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-check-lg me-1"></i>
+                        <span>Save Changes</span>
+                    }
+
+                </button>
+
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        @onclick="CancelEdit"
+                        disabled="@isSavingUser">
+                    Cancel
+                </button>
+
+            </EditForm>
+
+        </div>
+    </div>
+}
+
+        <span class="badge bg-secondary">
+            @users.Count user@(users.Count == 1 ? "" : "s")
+        </span>
+    </div>
+
+    <div class="card-body p-0">
+
+        @if (isLoadingUsers)
+        {
+            <div class="p-4 text-center">
+                <div class="spinner-border spinner-border-sm me-2"
+                     role="status">
+                </div>
+
+                Loading users...
+            </div>
+        }
+        else if (users.Count == 0)
+        {
+            <div class="p-4 text-muted">
+                No users have been created.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+
+                    <thead class="table-light">
+                        <tr>
+                            <th>Display Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Modules</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach (var user in users)
+                        {
+                            <tr>
+
+                                <td>
+                                    <strong>@user.DisplayName</strong>
+                                </td>
+
+                                <td>
+                                    @user.Email
+                                </td>
+
+                                <td>
+                                    @if (user.Role == "Administrator")
+                                    {
+                                        <span class="badge bg-danger">
+                                            Administrator
+                                        </span>
+                                    }
+                                    else if (user.Role == "Support")
+                                    {
+                                        <span class="badge bg-primary">
+                                            Support
+                                        </span>
+                                    }
+                                    else if (user.Role == "ReadOnly")
+                                    {
+                                        <span class="badge bg-secondary">
+                                            Read Only
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-dark">
+                                            @user.Role
+                                        </span>
+                                    }
+                                </td>
+
+                                <td>
+                                    @if (user.TicketsModuleEnabled)
+                                    {
+                                        <span class="badge bg-success me-1 mb-1">
+                                            Support Tickets
+                                        </span>
+                                    }
+
+                                    @if (user.OnboardingModuleEnabled)
+                                    {
+                                        <span class="badge bg-info text-dark me-1 mb-1">
+                                            Customer Onboarding
+                                        </span>
+                                    }
+
+                                    @if (user.TestingModuleEnabled)
+                                    {
+                                        <span class="badge bg-warning text-dark me-1 mb-1">Testing</span>
+                                    }
+                                    @if (user.ProjectsModuleEnabled)
+                                    {
+                                        <span class="badge bg-primary me-1 mb-1">Projects</span>
+                                    }
+
+                                    @if (!user.TicketsModuleEnabled &&
+                                         !user.OnboardingModuleEnabled &&
+                                         !user.TestingModuleEnabled &&
+                                         !user.ProjectsModuleEnabled)
+                                    {
+                                        <span class="text-muted">
+                                            No modules
+                                        </span>
+                                    }
+                                </td>
+
+                                <td>
+@if (user.Id == currentUserId)
+{
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary ms-2"
+            disabled
+            title="You cannot lock your own account">
+        <i class="bi bi-shield-lock me-1"></i>
+        Current User
+    </button>
+}
+else if (user.IsLockedOut)
+{
+    <button type="button"
+            class="btn btn-sm btn-outline-success ms-2"
+            @onclick="() => UnlockUserAsync(user)">
+        <i class="bi bi-unlock me-1"></i>
+        Unlock
+    </button>
+}
+else
+{
+    <button type="button"
+            class="btn btn-sm btn-outline-warning ms-2"
+            @onclick="() => LockUserAsync(user)">
+        <i class="bi bi-lock me-1"></i>
+        Lock
+    </button>
+}
+                                </td>
+
+                                <td class="text-end">
+
+    <button type="button"
+            class="btn btn-sm btn-outline-primary"
+            @onclick="() => BeginEdit(user)">
+        <i class="bi bi-pencil me-1"></i>
+        Edit
+    </button>
+
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary ms-2"
+            @onclick="() => BeginPasswordReset(user)">
+        <i class="bi bi-key me-1"></i>
+        Reset Password
+    </button>
+
+    @if (user.Id == currentUserId)
+    {
+        <button type="button"
+                class="btn btn-sm btn-outline-danger ms-2"
+                disabled
+                title="You cannot delete your own account">
+            <i class="bi bi-trash me-1"></i>
+            Delete
+        </button>
+    }
+    else
+    {
+        <button type="button"
+                class="btn btn-sm btn-outline-danger ms-2"
+                @onclick="() => BeginDelete(user)">
+            <i class="bi bi-trash me-1"></i>
+            Delete
+        </button>
+    }
+
+</td>
+
+                            </tr>
+                        }
+
+                    </tbody>
+
+                </table>
+            </div>
+        }
+
+    </div>
+</div>
+
+@if (passwordResetUser is not null)
+{
+    <div class="card mt-4">
+        <div class="card-header">
+            <strong>Reset password</strong>
+        </div>
+
+        <div class="card-body">
+
+            <p class="text-muted">
+                Reset the password for
+                <strong>@passwordResetUser.DisplayName</strong>
+                (@passwordResetUser.Email).
+            </p>
+
+            <EditForm Model="@passwordResetModel"
+                      OnValidSubmit="ResetPasswordAsync">
+
+                <DataAnnotationsValidator />
+
+                <ValidationSummary class="text-danger mb-3" />
+
+                <div class="mb-3">
+                    <label class="form-label">
+                        New password
+                    </label>
+
+                    <InputText @bind-Value="passwordResetModel.Password"
+                               class="form-control"
+                               type="password"
+                               autocomplete="new-password" />
+
+                    <ValidationMessage For="@(() => passwordResetModel.Password)" />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">
+                        Confirm new password
+                    </label>
+
+                    <InputText @bind-Value="passwordResetModel.ConfirmPassword"
+                               class="form-control"
+                               type="password"
+                               autocomplete="new-password" />
+
+                    <ValidationMessage For="@(() => passwordResetModel.ConfirmPassword)" />
+                </div>
+
+                <button type="submit"
+                        class="btn btn-primary me-2"
+                        disabled="@isResettingPassword">
+
+                    @if (isResettingPassword)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"
+                              role="status">
+                        </span>
+
+                        <span>Resetting...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-key me-1"></i>
+                        <span>Reset Password</span>
+                    }
+
+                </button>
+
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        @onclick="CancelPasswordReset"
+                        disabled="@isResettingPassword">
+                    Cancel
+                </button>
+
+            </EditForm>
+
+        </div>
+    </div>
+}
+
+@if (deletingUser is not null)
+{
+    <div class="card border-danger mt-4">
+        <div class="card-header text-bg-danger">
+            <strong>Delete user</strong>
+        </div>
+
+        <div class="card-body">
+            <p>
+                Are you sure you want to permanently delete
+                <strong>@deletingUser.DisplayName</strong>
+                (@deletingUser.Email)?
+            </p>
+
+            <p class="text-danger mb-4">
+                This action cannot be undone.
+            </p>
+
+            <button type="button"
+                    class="btn btn-danger me-2"
+                    @onclick="DeleteUserAsync"
+                    disabled="@isDeletingUser">
+                @if (isDeletingUser)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"
+                          role="status">
+                    </span>
+
+                    <span>Deleting...</span>
+                }
+                else
+                {
+                    <i class="bi bi-trash me-1"></i>
+                    <span>Delete User</span>
+                }
+            </button>
+
+            <button type="button"
+                    class="btn btn-outline-secondary"
+                    @onclick="CancelDelete"
+                    disabled="@isDeletingUser">
+                Cancel
+            </button>
+        </div>
+    </div>
+}
+
+@code
+{
+    private string? currentUserId;
+    private CreateUserModel newUser = new();
+
+    private string? successMessage;
+    private string? errorMessage;
+
+    private bool isCreating;
+
+    private bool showCreateUser;
+
+    private void ShowCreateUser()
+    {
+        successMessage = null;
+        errorMessage = null;
+        newUser = new CreateUserModel();
+        showCreateUser = true;
+    }
+    private List<UserListItem> users = new();
+
+    private bool isLoadingUsers = true;
+
+protected override async Task OnInitializedAsync()
+{
+    var authState =
+        await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+    var currentUser =
+        await UserManager.GetUserAsync(authState.User);
+
+    currentUserId = currentUser?.Id;
+
+    await LoadUsersAsync();
+}
+
+private async Task LoadUsersAsync()
+{
+    isLoadingUsers = true;
+
+    try
+    {
+        users.Clear();
+
+        var ticketModuleUserIds =
+            await ModuleAccessService.GetUserIdsAsync(
+                ModuleKeys.Tickets);
+
+        var onboardingModuleUserIds =
+            await ModuleAccessService.GetUserIdsAsync(
+                ModuleKeys.Onboarding);
+
+        var testingModuleUserIds =
+            await ModuleAccessService.GetUserIdsAsync(
+                ModuleKeys.Testing);
+        var projectsModuleUserIds = await ModuleAccessService.GetUserIdsAsync(ModuleKeys.Projects);
+
+        foreach (var user in UserManager.Users.ToList())
+        {
+            var roles =
+                await UserManager.GetRolesAsync(user);
+
+            users.Add(new UserListItem
+            {
+                Id = user.Id,
+                DisplayName = user.DisplayName ?? string.Empty,
+                Email = user.Email ?? string.Empty,
+                Role = roles.FirstOrDefault() ?? "No Role",
+                TicketsModuleEnabled =
+                    ticketModuleUserIds.Contains(user.Id),
+                OnboardingModuleEnabled =
+                    onboardingModuleUserIds.Contains(user.Id),
+                TestingModuleEnabled =
+                    testingModuleUserIds.Contains(user.Id),
+                ProjectsModuleEnabled = projectsModuleUserIds.Contains(user.Id),
+                IsLockedOut =
+                    user.LockoutEnd.HasValue &&
+                    user.LockoutEnd.Value > DateTimeOffset.UtcNow
+            });
+        }
+
+        users = users
+            .OrderBy(user => user.DisplayName)
+            .ToList();
+    }
+    finally
+    {
+        isLoadingUsers = false;
+    }
+}
+
+    private async Task CreateUserAsync()
+    {
+        successMessage = null;
+        errorMessage = null;
+        isCreating = true;
+
+        try
+        {
+            var email = newUser.Email.Trim();
+            var displayName = newUser.DisplayName.Trim();
+
+            var existingUser =
+                await UserManager.FindByEmailAsync(email);
+
+            if (existingUser is not null)
+            {
+                errorMessage =
+                    "A user with this email address already exists.";
+
+                return;
+            }
+
+            var roleExists =
+                await RoleManager.RoleExistsAsync(newUser.Role);
+
+            if (!roleExists)
+            {
+                errorMessage =
+                    "The selected role does not exist.";
+
+                return;
+            }
+
+            var user = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                DisplayName = displayName,
+                EmailConfirmed = true
+            };
+
+            var createResult =
+                await UserManager.CreateAsync(
+                    user,
+                    newUser.Password);
+
+            if (!createResult.Succeeded)
+            {
+                errorMessage = string.Join(
+                    " ",
+                    createResult.Errors.Select(
+                        error => error.Description));
+
+                return;
+            }
+
+            var roleResult =
+                await UserManager.AddToRoleAsync(
+                    user,
+                    newUser.Role);
+
+            if (!roleResult.Succeeded)
+            {
+                // Don't leave a partially created user
+                // if the role assignment fails.
+                await UserManager.DeleteAsync(user);
+
+                errorMessage = string.Join(
+                    " ",
+                    roleResult.Errors.Select(
+                        error => error.Description));
+
+                return;
+            }
+
+            await ModuleAccessService.SetAccessAsync(
+                user.Id,
+                ModuleKeys.Tickets,
+                newUser.TicketsModuleEnabled);
+
+            await ModuleAccessService.SetAccessAsync(
+                user.Id,
+                ModuleKeys.Onboarding,
+                newUser.OnboardingModuleEnabled);
+
+            await ModuleAccessService.SetAccessAsync(
+                user.Id,
+                ModuleKeys.Testing,
+                newUser.TestingModuleEnabled);
+            await ModuleAccessService.SetAccessAsync(user.Id, ModuleKeys.Projects, newUser.ProjectsModuleEnabled);
+
+            await AuditLogService.RecordAsync(
+                "User created",
+                user.Id,
+                user.Email,
+                $"Created user with role {newUser.Role}. " +
+                $"Support Tickets: " +
+                $"{(newUser.TicketsModuleEnabled ? "enabled" : "disabled")}. " +
+                $"Customer Onboarding: " +
+                $"{(newUser.OnboardingModuleEnabled ? "enabled" : "disabled")}. " +
+                $"Testing: {(newUser.TestingModuleEnabled ? "enabled" : "disabled")}. " +
+                $"Projects: {(newUser.ProjectsModuleEnabled ? "enabled" : "disabled")}.");
+
+successMessage =
+    $"{displayName} has been created as {newUser.Role}.";
+
+newUser = new CreateUserModel();
+showCreateUser = false;
+
+await LoadUsersAsync();
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    private sealed class CreateUserModel
+    {
+        [Required(
+            ErrorMessage = "Please enter a display name.")]
+        [StringLength(100)]
+        public string DisplayName { get; set; } = string.Empty;
+
+        [Required(
+            ErrorMessage = "Please enter an email address.")]
+        [EmailAddress(
+            ErrorMessage = "Please enter a valid email address.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(
+            ErrorMessage = "Please enter a password.")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(
+            ErrorMessage = "Please confirm the password.")]
+        [DataType(DataType.Password)]
+        [Compare(
+            nameof(Password),
+            ErrorMessage = "The passwords do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+
+        [Required(
+            ErrorMessage = "Please select a role.")]
+        public string Role { get; set; } = string.Empty;
+
+        public bool TicketsModuleEnabled { get; set; } = true;
+
+        public bool OnboardingModuleEnabled { get; set; }
+
+        public bool TestingModuleEnabled { get; set; }
+        public bool ProjectsModuleEnabled { get; set; }
+    }
+
+    private sealed class UserListItem
+{
+    public string Id { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public string Email { get; set; } = string.Empty;
+
+    public string Role { get; set; } = string.Empty;
+
+    public bool TicketsModuleEnabled { get; set; }
+
+    public bool OnboardingModuleEnabled { get; set; }
+
+    public bool TestingModuleEnabled { get; set; }
+    public bool ProjectsModuleEnabled { get; set; }
+
+    public bool IsLockedOut { get; set; }
+}
+
+private UserListItem? editingUser;
+
+private EditUserModel editUserModel = new();
+
+private bool isSavingUser;
+
+private UserListItem? passwordResetUser;
+
+private PasswordResetModel passwordResetModel = new();
+
+private bool isResettingPassword;
+
+private UserListItem? deletingUser;
+
+private bool isDeletingUser;
+
+private void BeginEdit(UserListItem user)
+{
+    successMessage = null;
+    errorMessage = null;
+
+    editingUser = user;
+
+    editUserModel = new EditUserModel
+    {
+        DisplayName = user.DisplayName,
+        Role = user.Role,
+        TicketsModuleEnabled = user.TicketsModuleEnabled,
+        OnboardingModuleEnabled = user.OnboardingModuleEnabled,
+        TestingModuleEnabled = user.TestingModuleEnabled
+        ,ProjectsModuleEnabled = user.ProjectsModuleEnabled
+    };
+}
+
+private void CancelEdit()
+{
+    editingUser = null;
+    editUserModel = new EditUserModel();
+}
+
+private void BeginPasswordReset(UserListItem user)
+{
+    successMessage = null;
+    errorMessage = null;
+
+    passwordResetUser = user;
+    passwordResetModel = new PasswordResetModel();
+}
+
+private void CancelPasswordReset()
+{
+    passwordResetUser = null;
+    passwordResetModel = new PasswordResetModel();
+}
+
+private void BeginDelete(UserListItem user)
+{
+    successMessage = null;
+    errorMessage = null;
+
+    if (user.Id == currentUserId)
+    {
+        errorMessage = "You cannot delete your own account.";
+        return;
+    }
+
+    deletingUser = user;
+}
+
+private void CancelDelete()
+{
+    deletingUser = null;
+}
+
+private async Task DeleteUserAsync()
+{
+    if (deletingUser is null)
+    {
+        return;
+    }
+
+    successMessage = null;
+    errorMessage = null;
+    isDeletingUser = true;
+
+    try
+    {
+        if (deletingUser.Id == currentUserId)
+        {
+            errorMessage = "You cannot delete your own account.";
+            return;
+        }
+
+        var user =
+            await UserManager.FindByIdAsync(deletingUser.Id);
+
+        if (user is null)
+        {
+            errorMessage = "The selected user could not be found.";
+            deletingUser = null;
+            return;
+        }
+
+        var roles =
+            await UserManager.GetRolesAsync(user);
+
+        if (roles.Contains("Administrator"))
+        {
+            var administrators =
+                await UserManager.GetUsersInRoleAsync("Administrator");
+
+            if (administrators.Count <= 1)
+            {
+                errorMessage =
+                    "You cannot delete the last remaining administrator.";
+
+                return;
+            }
+        }
+
+        var displayName =
+            user.DisplayName ?? user.Email ?? "The user";
+
+        var email = user.Email;
+
+        var roleSummary =
+            roles.Count == 0
+                ? "No Role"
+                : string.Join(", ", roles);
+
+        var result =
+            await UserManager.DeleteAsync(user);
+
+        if (!result.Succeeded)
+        {
+            errorMessage = string.Join(
+                " ",
+                result.Errors.Select(
+                    error => error.Description));
+
+            return;
+        }
+
+        await AuditLogService.RecordAsync(
+            "User deleted",
+            user.Id,
+            email,
+            $"Deleted user with role {roleSummary}.");
+
+        successMessage =
+            $"{displayName} has been deleted.";
+
+        deletingUser = null;
+
+        await LoadUsersAsync();
+    }
+    finally
+    {
+        isDeletingUser = false;
+    }
+}
+
+private async Task ResetPasswordAsync()
+{
+    if (passwordResetUser is null)
+    {
+        return;
+    }
+
+    successMessage = null;
+    errorMessage = null;
+    isResettingPassword = true;
+
+    try
+    {
+        var user =
+            await UserManager.FindByIdAsync(passwordResetUser.Id);
+
+        if (user is null)
+        {
+            errorMessage =
+                "The selected user could not be found.";
+
+            return;
+        }
+
+        var resetToken =
+            await UserManager.GeneratePasswordResetTokenAsync(user);
+
+        var result =
+            await UserManager.ResetPasswordAsync(
+                user,
+                resetToken,
+                passwordResetModel.Password);
+
+        if (!result.Succeeded)
+        {
+            errorMessage = string.Join(
+                " ",
+                result.Errors.Select(
+                    error => error.Description));
+
+            return;
+        }
+
+        await AuditLogService.RecordAsync(
+            "Password reset",
+            user.Id,
+            user.Email,
+            "Reset the user's password.");
+
+        successMessage =
+            $"The password for {user.DisplayName} has been reset.";
+
+        passwordResetUser = null;
+        passwordResetModel = new PasswordResetModel();
+    }
+    finally
+    {
+        isResettingPassword = false;
+    }
+}
+
+private async Task SaveUserAsync()
+{
+    if (editingUser is null)
+    {
+        return;
+    }
+
+    successMessage = null;
+    errorMessage = null;
+    isSavingUser = true;
+
+    try
+    {
+        var user =
+            await UserManager.FindByIdAsync(editingUser.Id);
+
+        if (user is null)
+        {
+            errorMessage =
+                "The selected user could not be found.";
+
+            return;
+        }
+
+        var displayName =
+            editUserModel.DisplayName.Trim();
+
+        var previousDisplayName =
+            user.DisplayName ?? string.Empty;
+
+        var previousTicketsModuleEnabled =
+            editingUser.TicketsModuleEnabled;
+
+        var previousOnboardingModuleEnabled =
+            editingUser.OnboardingModuleEnabled;
+
+        var previousTestingModuleEnabled =
+            editingUser.TestingModuleEnabled;
+        var previousProjectsModuleEnabled = editingUser.ProjectsModuleEnabled;
+
+        var roleExists =
+            await RoleManager.RoleExistsAsync(editUserModel.Role);
+
+        if (!roleExists)
+        {
+            errorMessage =
+                "The selected role does not exist.";
+
+            return;
+        }
+
+        if (!string.Equals(user.DisplayName, displayName, StringComparison.Ordinal))
+        {
+            user.DisplayName = displayName;
+
+            var updateResult =
+                await UserManager.UpdateAsync(user);
+
+            if (!updateResult.Succeeded)
+            {
+                errorMessage = string.Join(
+                    " ",
+                    updateResult.Errors.Select(
+                        error => error.Description));
+
+                return;
+            }
+        }
+
+        var currentRoles =
+    await UserManager.GetRolesAsync(user);
+
+var isCurrentlyAdministrator =
+    currentRoles.Contains("Administrator");
+
+var isChangingAwayFromAdministrator =
+    isCurrentlyAdministrator &&
+    editUserModel.Role != "Administrator";
+
+if (isChangingAwayFromAdministrator)
+{
+    var administrators =
+        await UserManager.GetUsersInRoleAsync("Administrator");
+
+    if (administrators.Count <= 1)
+    {
+        errorMessage =
+            "You cannot remove the Administrator role from the last remaining administrator.";
+
+        return;
+    }
+}
+
+if (!currentRoles.Contains(editUserModel.Role))
+{
+    if (currentRoles.Count > 0)
+    {
+        var removeResult =
+            await UserManager.RemoveFromRolesAsync(
+                user,
+                currentRoles);
+
+        if (!removeResult.Succeeded)
+        {
+            errorMessage = string.Join(
+                " ",
+                removeResult.Errors.Select(
+                    error => error.Description));
+
+            return;
+        }
+    }
+
+    var addRoleResult =
+        await UserManager.AddToRoleAsync(
+            user,
+            editUserModel.Role);
+
+    if (!addRoleResult.Succeeded)
+    {
+        errorMessage = string.Join(
+            " ",
+            addRoleResult.Errors.Select(
+                error => error.Description));
+
+        return;
+    }
+}
+
+        var previousRole =
+            currentRoles.FirstOrDefault() ?? "No Role";
+
+        await ModuleAccessService.SetAccessAsync(
+            user.Id,
+            ModuleKeys.Tickets,
+            editUserModel.TicketsModuleEnabled);
+
+        await ModuleAccessService.SetAccessAsync(
+            user.Id,
+            ModuleKeys.Onboarding,
+            editUserModel.OnboardingModuleEnabled);
+
+        await ModuleAccessService.SetAccessAsync(
+            user.Id,
+            ModuleKeys.Testing,
+            editUserModel.TestingModuleEnabled);
+        await ModuleAccessService.SetAccessAsync(user.Id, ModuleKeys.Projects, editUserModel.ProjectsModuleEnabled);
+
+        await AuditLogService.RecordAsync(
+            "User updated",
+            user.Id,
+            user.Email,
+            $"Display name: '{previousDisplayName}' to '{displayName}'. " +
+            $"Role: {previousRole} to {editUserModel.Role}. " +
+            $"Support Tickets: " +
+            $"{(previousTicketsModuleEnabled ? "enabled" : "disabled")} to " +
+            $"{(editUserModel.TicketsModuleEnabled ? "enabled" : "disabled")}. " +
+            $"Customer Onboarding: " +
+            $"{(previousOnboardingModuleEnabled ? "enabled" : "disabled")} to " +
+            $"{(editUserModel.OnboardingModuleEnabled ? "enabled" : "disabled")}. " +
+            $"Testing: {(previousTestingModuleEnabled ? "enabled" : "disabled")} to " +
+            $"{(editUserModel.TestingModuleEnabled ? "enabled" : "disabled")}. " +
+            $"Projects: {(previousProjectsModuleEnabled ? "enabled" : "disabled")} to " +
+            $"{(editUserModel.ProjectsModuleEnabled ? "enabled" : "disabled")}.");
+
+        successMessage =
+            $"{displayName} has been updated.";
+
+        editingUser = null;
+        editUserModel = new EditUserModel();
+
+        await LoadUsersAsync();
+    }
+    finally
+    {
+        isSavingUser = false;
+    }
+}
+
+
+private sealed class EditUserModel
+{
+    [Required(
+        ErrorMessage = "Please enter a display name.")]
+    [StringLength(100)]
+    public string DisplayName { get; set; } = string.Empty;
+
+    [Required(
+        ErrorMessage = "Please select a role.")]
+    public string Role { get; set; } = string.Empty;
+
+    public bool TicketsModuleEnabled { get; set; }
+
+    public bool OnboardingModuleEnabled { get; set; }
+
+    public bool TestingModuleEnabled { get; set; }
+    public bool ProjectsModuleEnabled { get; set; }
+}
+
+private async Task LockUserAsync(UserListItem userItem)
+{
+    successMessage = null;
+    errorMessage = null;
+
+    if (userItem.Id == currentUserId)
+    {
+        errorMessage =
+            "You cannot lock your own account.";
+
+        return;
+    }
+
+    var user =
+        await UserManager.FindByIdAsync(userItem.Id);
+
+    if (user is null)
+    {
+        errorMessage =
+            "The selected user could not be found.";
+
+        return;
+    }
+
+    var result =
+        await UserManager.SetLockoutEndDateAsync(
+            user,
+            DateTimeOffset.MaxValue);
+
+    if (!result.Succeeded)
+    {
+        errorMessage = string.Join(
+            " ",
+            result.Errors.Select(
+                error => error.Description));
+
+        return;
+    }
+
+    await AuditLogService.RecordAsync(
+        "User locked",
+        user.Id,
+        user.Email,
+        "Locked the user account.");
+
+    successMessage =
+        $"{user.DisplayName} has been locked.";
+
+    await LoadUsersAsync();
+}
+
+private async Task UnlockUserAsync(UserListItem userItem)
+{
+    successMessage = null;
+    errorMessage = null;
+
+    var user =
+        await UserManager.FindByIdAsync(userItem.Id);
+
+    if (user is null)
+    {
+        errorMessage = "The selected user could not be found.";
+        return;
+    }
+
+    var result =
+        await UserManager.SetLockoutEndDateAsync(
+            user,
+            null);
+
+    if (!result.Succeeded)
+    {
+        errorMessage = string.Join(
+            " ",
+            result.Errors.Select(
+                error => error.Description));
+
+        return;
+    }
+
+    await AuditLogService.RecordAsync(
+        "User unlocked",
+        user.Id,
+        user.Email,
+        "Unlocked the user account.");
+
+    successMessage =
+        $"{user.DisplayName} has been unlocked.";
+
+    await LoadUsersAsync();
+}
+
+private sealed class PasswordResetModel
+{
+    [Required(
+        ErrorMessage = "Please enter a new password.")]
+    [DataType(DataType.Password)]
+    public string Password { get; set; } = string.Empty;
+
+    [Required(
+        ErrorMessage = "Please confirm the new password.")]
+    [DataType(DataType.Password)]
+    [Compare(
+        nameof(Password),
+        ErrorMessage = "The passwords do not match.")]
+    public string ConfirmPassword { get; set; } = string.Empty;
+}
+}

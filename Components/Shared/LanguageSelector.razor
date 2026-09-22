@@ -1,0 +1,105 @@
+<div class="language-selector">
+    <label class="language-option">
+        <input type="checkbox"
+               class="form-check-input"
+               checked="@languages.Contains("Portuguese")"
+               @onchange="TogglePortugueseAsync" />
+        <span>Portuguese</span>
+    </label>
+
+    <div class="input-group mt-2">
+        <input class="form-control"
+               placeholder="Add another language"
+               @bind="newLanguage" />
+        <button type="button"
+                class="btn btn-outline-secondary"
+                disabled="@string.IsNullOrWhiteSpace(newLanguage)"
+                @onclick="AddLanguageAsync">
+            Add
+        </button>
+    </div>
+
+    @if (languages.Count > 0)
+    {
+        <div class="language-tags mt-2">
+            @foreach (var language in languages.OrderBy(value => value))
+            {
+                <span class="language-tag">
+                    @language
+                    <button type="button"
+                            title="Remove @language"
+                            aria-label="Remove @language"
+                            @onclick="() => RemoveLanguageAsync(language)">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    private HashSet<string> languages = new(StringComparer.OrdinalIgnoreCase);
+    private string newLanguage = string.Empty;
+    private string lastValue = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (string.Equals(lastValue, Value, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        languages = Value
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        lastValue = Value;
+    }
+
+    private async Task TogglePortugueseAsync(ChangeEventArgs args)
+    {
+        if (args.Value is true)
+        {
+            languages.Add("Portuguese");
+        }
+        else
+        {
+            languages.Remove("Portuguese");
+        }
+
+        await CommitAsync();
+    }
+
+    private async Task AddLanguageAsync()
+    {
+        var language = newLanguage.Trim();
+
+        if (language.Length == 0)
+        {
+            return;
+        }
+
+        languages.Add(language);
+        newLanguage = string.Empty;
+        await CommitAsync();
+    }
+
+    private async Task RemoveLanguageAsync(string language)
+    {
+        languages.Remove(language);
+        await CommitAsync();
+    }
+
+    private async Task CommitAsync()
+    {
+        lastValue = string.Join(", ", languages.OrderBy(value => value));
+        Value = lastValue;
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

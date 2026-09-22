@@ -1,0 +1,35 @@
+<PageTitle>@Title | @SiteName</PageTitle>
+
+<div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+        <h1 class="mb-1">@Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Description))
+        {
+            <p class="text-muted mb-0">@Description</p>
+        }
+    </div>
+
+    @if (Actions is not null || ChildContent is not null)
+    {
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            @(Actions ?? ChildContent)
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
+    public string SiteName { get; set; } = "SGS Service Portal";
+
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

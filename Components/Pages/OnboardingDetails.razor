@@ -1,0 +1,362 @@
+@page "/onboarding/{Id:int}"
+@rendermode InteractiveServer
+
+@using ServicePortal.Data
+@using ServicePortal.Services
+@using ServicePortal.Components.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+
+@attribute [Authorize(Policy = "OnboardingModule")]
+
+@inject OnboardingService OnboardingService
+@inject CustomOnboardingFieldService CustomOnboardingFieldService
+@inject NavigationManager Navigation
+
+<PageTitle>@(onboarding is null ? "Onboarding" : onboarding.CustomerName)</PageTitle>
+
+@if (isLoading)
+{
+    <div class="p-5 text-center">
+        <div class="spinner-border text-primary" role="status"></div>
+        <div class="text-muted mt-2">Loading onboarding...</div>
+    </div>
+}
+else if (onboarding is null)
+{
+    <div class="alert alert-warning">The requested customer onboarding could not be found.</div>
+    <button class="btn btn-outline-secondary" @onclick="Back">Back to Onboarding</button>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div>
+            <button class="btn btn-link px-0 mb-2 text-decoration-none" @onclick="Back">
+                <i class="bi bi-arrow-left me-1"></i>
+                Customer Onboarding
+            </button>
+            <div class="d-flex align-items-center gap-3"><button type="button" class="btn btn-outline-secondary btn-sm" title="Add or change image" @onclick="() => showImagePicker = true">@if (onboarding.ImageContent is { Length: > 0 }) { <img src="onboarding-images/@onboarding.Id" alt="" class="rounded" style="width: 28px; height: 28px; object-fit: cover;" /> } else { <i class="bi bi-image"></i> } </button><h1 class="mb-1">@onboarding.CustomerName</h1></div>
+            <p class="text-muted mb-0">
+                @onboarding.OnboardingReference · @onboarding.ProductsPurchased
+            </p>
+        </div>
+        <span class="badge fs-6 @StatusBadge(onboarding.Status)">@onboarding.Status</span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (showImagePicker)
+    {
+        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="z-index: 1050; background: rgba(0,0,0,.45);" @onclick="() => showImagePicker = false">
+            <div class="card shadow" style="width: min(28rem, 90vw);" @onclick:stopPropagation="true"><div class="card-body"><div class="d-flex justify-content-between align-items-center mb-3"><strong>Choose onboarding image</strong><button class="btn-close" @onclick="() => showImagePicker = false"></button></div><InputFile class="form-control" accept="image/png,image/jpeg,image/webp" OnChange="UploadImageAsync" /><div class="form-text">PNG, JPG, or WebP up to 5 MB.</div></div></div>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-xl-7">
+            <div class="onboarding-product-fields h-100">
+                <div class="onboarding-product-fields-heading">
+                    <i class="bi bi-check2-square"></i>
+                    <div class="flex-grow-1"><strong>Onboarding Checklist</strong><div class="text-muted small">Track the steps to go-live</div></div>
+                    <span class="text-muted small">
+                        @onboarding.CompletedTaskCount of @onboarding.ChecklistItems.Count complete
+                    </span>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                        <div class="progress flex-grow-1" style="height: 12px;">
+                            <div class="progress-bar bg-success"
+                                 style="@($"width: {onboarding.ProgressPercent}%")"></div>
+                        </div>
+                        <strong>@onboarding.ProgressPercent%</strong>
+                    </div>
+
+                    <div class="onboarding-checklist">
+                        @foreach (var item in onboarding.ChecklistItems.OrderBy(item => item.SortOrder))
+                        {
+                            <label class="onboarding-checklist-item @(item.IsComplete ? "complete" : null)">
+                                <input type="checkbox"
+                                       class="form-check-input"
+                                       checked="@item.IsComplete"
+                                       disabled="@isUpdatingChecklist"
+                                       @onchange="args => SetChecklistItemAsync(item.Id, (bool?)args.Value == true)" />
+                                <span class="flex-grow-1">@item.Title</span>
+                                @if (item.CompletedAt.HasValue)
+                                {
+                                    <span class="text-muted small">
+                                        @item.CompletedAt.Value.ToLocalTime().ToString("dd/MM/yyyy")
+                                    </span>
+                                }
+                            </label>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-5">
+            <div class="onboarding-product-fields">
+                <div class="onboarding-product-fields-heading"><i class="bi bi-buildings"></i><div><strong>Customer Details</strong><div class="text-muted small">Company and contact information</div></div></div>
+                <div>
+                    <EditForm Model="onboarding" OnValidSubmit="SaveAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger mb-3" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Status</label>
+                            <InputSelect class="form-select" @bind-Value="onboarding.Status">
+                                <option>Not Started</option><option>In Progress</option><option>Complete</option>
+                            </InputSelect>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">@(IsEcert ? "Chamber of Commerce" : "Company Name")</label>
+                            <InputText class="form-control" required @bind-Value="onboarding.CustomerName" />
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-12">
+                                <label class="form-label">@(IsEcert ? "Chamber Contact" : "Company Contact")</label>
+                                <InputText class="form-control" required @bind-Value="onboarding.ContactName" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">@(IsEcert ? "Chamber Email" : "Contact email")</label>
+                                <InputText class="form-control" required type="email" @bind-Value="onboarding.ContactEmail" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Implementation owner</label>
+                            <InputSelect class="form-select" @bind-Value="onboarding.ImplementationOwner">
+                                <option value="">Select an owner</option>
+                                @foreach (var owner in implementationOwners)
+                                {
+                                    <option value="@owner">@owner</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Software / package purchased</label>
+                            <OnboardingProductSelector @bind-Value="onboarding.ProductsPurchased" Onboarding="onboarding" />
+                        </div>
+
+                        <OnboardingConditionalFields Model="onboarding" />
+
+                        @if (customFields.Count > 0)
+                        {
+                            <div class="onboarding-product-fields mt-3">
+                                <div class="onboarding-product-fields-heading"><i class="bi bi-ui-checks"></i><div><strong>Additional Details</strong><div class="text-muted small">Fields configured by an administrator</div></div></div>
+                                <div class="row g-3">
+                                    @foreach (var field in customFields)
+                                    {
+                                        <div class="col-md-6">
+                                            <label class="form-label">@field.Label</label>
+                                            @if (field.FieldType == "Date") { <input class="form-control" type="text" placeholder="DD/MM/YYYY" @bind="customValues[field.Id]" /> }
+                                            else if (field.FieldType == "Dropdown") { <select class="form-select" @bind="customValues[field.Id]"><option value="">Select option</option>@foreach (var option in field.Options.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)) { <option value="@option">@option</option> }</select> }
+                                            else { <input class="form-control" @bind="customValues[field.Id]" /> }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <div class="mb-4">
+                            <label class="form-label">Notes</label>
+                            <InputTextArea class="form-control" rows="4" @bind-Value="onboarding.Notes" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                            @if (isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Save Changes
+                        </button>
+                        <AuthorizeView Roles="Administrator">
+                            <Authorized Context="adminContext">
+                                @if (confirmDelete)
+                                {
+                                    <button type="button" class="btn btn-danger ms-2" @onclick="DeleteAsync">Confirm delete</button>
+                                    <button type="button" class="btn btn-outline-secondary ms-2" @onclick="() => confirmDelete = false">Cancel</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-outline-danger ms-2" @onclick="() => confirmDelete = true"><i class="bi bi-trash me-1"></i>Delete</button>
+                                }
+                            </Authorized>
+                        </AuthorizeView>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private CustomerOnboarding? onboarding;
+    private List<string> implementationOwners = new();
+    private List<CustomOnboardingField> customFields = [];
+    private Dictionary<int, string> customValues = [];
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool isUpdatingChecklist;
+    private bool showImagePicker;
+    private string? successMessage;
+    private string? errorMessage;
+    private bool confirmDelete;
+    private bool IsEcert => onboarding is not null && OnboardingProductCatalog.Parse(onboarding.ProductsPurchased).Products.Contains("eCERT");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        implementationOwners =
+            await OnboardingService.GetImplementationOwnersAsync();
+        onboarding = await OnboardingService.GetAsync(Id);
+        customFields = await CustomOnboardingFieldService.GetFieldsAsync();
+        var storedCustomValues = await CustomOnboardingFieldService.GetValuesAsync(Id);
+        customValues = customFields.ToDictionary(field => field.Id, field => storedCustomValues.FirstOrDefault(value => value.CustomOnboardingFieldId == field.Id)?.Value ?? string.Empty);
+
+        if (!string.IsNullOrWhiteSpace(onboarding?.ImplementationOwner) &&
+            !implementationOwners.Contains(onboarding.ImplementationOwner))
+        {
+            implementationOwners.Add(onboarding.ImplementationOwner);
+            implementationOwners = implementationOwners
+                .OrderBy(owner => owner)
+                .ToList();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (onboarding is null)
+        {
+            return;
+        }
+
+        successMessage = null;
+        errorMessage = null;
+
+        var requiredErrors = OnboardingService.GetRequiredFieldErrors(onboarding);
+        if (requiredErrors.Count > 0)
+        {
+            errorMessage = string.Join(" ", requiredErrors);
+            return;
+        }
+
+        if (onboarding.TargetGoLiveDate < onboarding.StartDate)
+        {
+            errorMessage = "The target go-live date cannot be before the start date.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            if (!await OnboardingService.UpdateAsync(onboarding))
+            {
+                errorMessage = "The onboarding could not be found.";
+                return;
+            }
+
+            await CustomOnboardingFieldService.SaveValuesAsync(onboarding.Id, customValues);
+
+            successMessage = "Customer onboarding updated.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"The onboarding could not be saved: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SetChecklistItemAsync(int itemId, bool isComplete)
+    {
+        isUpdatingChecklist = true;
+        successMessage = null;
+        errorMessage = null;
+
+        try
+        {
+            if (!await OnboardingService.SetChecklistItemAsync(itemId, isComplete))
+            {
+                errorMessage = "The checklist item could not be updated.";
+                return;
+            }
+
+            onboarding = await OnboardingService.GetAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"The checklist could not be updated: {ex.Message}";
+        }
+        finally
+        {
+            isUpdatingChecklist = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (onboarding is null || !await OnboardingService.DeleteAsync(onboarding.Id)) { errorMessage = "The onboarding could not be deleted."; return; }
+        Navigation.NavigateTo("onboarding");
+    }
+
+    private void Back() => Navigation.NavigateTo("onboarding");
+
+    private async Task UploadImageAsync(InputFileChangeEventArgs args)
+    {
+        if (onboarding is null) return;
+        var file = args.File;
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (file.Size > 5 * 1024 * 1024 || extension is not ".png" and not ".jpg" and not ".jpeg" and not ".webp")
+        {
+            errorMessage = "Choose a PNG, JPG, or WebP image up to 5 MB.";
+            return;
+        }
+        await using var input = file.OpenReadStream(5 * 1024 * 1024);
+        using var memory = new MemoryStream();
+        await input.CopyToAsync(memory);
+        var contentType = extension == ".png" ? "image/png" : extension == ".webp" ? "image/webp" : "image/jpeg";
+        await OnboardingService.UpdateImageAsync(onboarding.Id, Guid.NewGuid().ToString("N") + extension, contentType, memory.ToArray());
+        onboarding = await OnboardingService.GetAsync(Id);
+        showImagePicker = false;
+        successMessage = "Onboarding image saved.";
+    }
+
+    private static string StatusBadge(string status) => status switch
+    {
+        "Complete" => "bg-success",
+        "Blocked" => "bg-danger",
+        "In Progress" => "bg-primary",
+        _ => "bg-secondary"
+    };
+}
+
+
+
+

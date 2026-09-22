@@ -1,0 +1,213 @@
+@using ServicePortal.Data
+
+<div class="onboarding-product-selector">
+    <button type="button"
+            class="product-selector-button @(selection.Products.Count == 0 ? "missing-field" : "")"
+            aria-expanded="@isOpen"
+            @onclick="ToggleOpen">
+        <span class="product-selector-value @(selection.Products.Count == 0 ? "placeholder" : null)">
+            @SelectionSummary
+        </span>
+        <i class="bi @(isOpen ? "bi-chevron-up" : "bi-chevron-down")" aria-hidden="true"></i>
+    </button>
+
+    @if (isOpen)
+    {
+        <div class="product-selector-menu">
+            <div class="product-selector-help">Select one or more software products</div>
+
+            @foreach (var product in OnboardingProductCatalog.Products)
+            {
+                <div class="product-selector-option"
+                     role="checkbox"
+                     tabindex="0"
+                     aria-checked="@selection.Products.Contains(product)"
+                     @onclick="() => ToggleProductAsync(product)">
+                    <input type="checkbox"
+                           class="form-check-input"
+                           checked="@selection.Products.Contains(product)"
+                           @onclick:stopPropagation="true"
+                           @onchange="args => SetProductSelectedAsync(product, args.Value is true)" />
+                    <span>@product</span>
+                </div>
+            }
+        </div>
+    }
+
+    @foreach (var product in OnboardingProductCatalog.Products)
+    {
+        if (selection.Products.Contains(product) &&
+            OnboardingProductCatalog.Options.TryGetValue(product, out var productOptions))
+        {
+            <div class="product-options-panel">
+                <button type="button"
+                        class="product-selector-button product-options-button"
+                        aria-expanded="@IsOptionsOpen(product)"
+                        @onclick="() => ToggleOptions(product)">
+                    <span>
+                        <strong>@product Options</strong>
+                        <span class="product-options-helper">Select any that apply</span>
+                    </span>
+                    <span class="d-flex align-items-center gap-2">
+                        <span class="badge bg-secondary">@SelectedOptionCount(product) selected</span>
+                        <i class="bi @(IsOptionsOpen(product) ? "bi-chevron-up" : "bi-chevron-down")" aria-hidden="true"></i>
+                    </span>
+                </button>
+
+                @if (IsOptionsOpen(product))
+                {
+                <div class="product-options-grid">
+                    @foreach (var option in productOptions)
+                    {
+                        <div class="product-selector-option product-suboption"
+                             role="checkbox"
+                             tabindex="0"
+                             aria-checked="@IsOptionSelected(product, option)"
+                             @onclick="() => ToggleOptionAsync(product, option)">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   checked="@IsOptionSelected(product, option)"
+                                   @onclick:stopPropagation="true"
+                                   @onchange="args => SetOptionSelectedAsync(product, option, args.Value is true)" />
+                            <span>@option</span>
+                        </div>
+                    }
+                </div>
+                @if (product == "eCERT" && Onboarding is not null)
+                {
+                    <div class="product-language-field">
+                        <label class="form-label">Languages Required</label>
+                        <InputSelect class="form-select" @bind-Value="LanguageSelection">
+                            <option value="">Select language</option><option>English</option><option>Portuguese</option><option>Other</option>
+                        </InputSelect>
+                    </div>
+                    @if (LanguageSelection == "Other")
+                    {
+                        <div class="product-language-field">
+                            <label class="form-label">Other language</label>
+                            <InputText class="form-control" placeholder="Enter language" @bind-Value="OtherLanguage" />
+                        </div>
+                    }
+                }
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter]
+    public CustomerOnboarding? Onboarding { get; set; }
+
+    private ProductSelection selection = new();
+    private readonly HashSet<string> openProductOptions = new(StringComparer.OrdinalIgnoreCase);
+    private string lastValue = string.Empty;
+    private bool isOpen;
+
+    private string SelectionSummary => selection.Products.Count == 0
+        ? "Select software / packages"
+        : string.Join(", ", OnboardingProductCatalog.Products
+            .Where(selection.Products.Contains));
+
+    protected override void OnParametersSet()
+    {
+        if (string.Equals(Value, lastValue, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        selection = OnboardingProductCatalog.Parse(Value);
+        lastValue = Value;
+    }
+
+    private void ToggleOpen() => isOpen = !isOpen;
+    private void ToggleOptions(string product)
+    {
+        if (!openProductOptions.Add(product))
+            openProductOptions.Remove(product);
+    }
+
+    private bool IsOptionsOpen(string product) => openProductOptions.Contains(product);
+
+    private Task ToggleProductAsync(string product) =>
+        SetProductSelectedAsync(product, !selection.Products.Contains(product));
+
+    private async Task SetProductSelectedAsync(string product, bool isSelected)
+    {
+        if (isSelected)
+        {
+            selection.Products.Add(product);
+        }
+        else
+        {
+            selection.Products.Remove(product);
+            selection.Options.Remove(product);
+        }
+
+        await CommitAsync();
+    }
+
+    private Task ToggleOptionAsync(string product, string option) =>
+        SetOptionSelectedAsync(product, option, !IsOptionSelected(product, option));
+
+    private async Task SetOptionSelectedAsync(
+        string product,
+        string option,
+        bool isSelected)
+    {
+        if (!selection.Options.TryGetValue(product, out var selectedOptions))
+        {
+            selectedOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            selection.Options[product] = selectedOptions;
+        }
+
+        if (isSelected)
+        {
+            selectedOptions.Add(option);
+        }
+        else
+        {
+            selectedOptions.Remove(option);
+        }
+
+        await CommitAsync();
+    }
+
+    private async Task CommitAsync()
+    {
+        lastValue = OnboardingProductCatalog.Serialize(selection);
+        Value = lastValue;
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    private bool IsOptionSelected(string product, string option) =>
+        selection.Options.TryGetValue(product, out var selectedOptions) &&
+        selectedOptions.Contains(option);
+
+    private int SelectedOptionCount(string product) =>
+        selection.Options.TryGetValue(product, out var selectedOptions)
+            ? selectedOptions.Count
+            : 0;
+
+    private string LanguageSelection
+    {
+        get => Onboarding?.LanguagesRequired is "English" or "Portuguese" ? Onboarding.LanguagesRequired : string.IsNullOrWhiteSpace(Onboarding?.LanguagesRequired) ? string.Empty : "Other";
+        set
+        {
+            if (Onboarding is null) return;
+            Onboarding.LanguagesRequired = value == "Other" ? "Other" : value;
+        }
+    }
+
+    private string OtherLanguage
+    {
+        get => Onboarding?.LanguagesRequired == "Other" ? string.Empty : Onboarding?.LanguagesRequired ?? string.Empty;
+        set { if (Onboarding is not null) Onboarding.LanguagesRequired = value; }
+    }
+}

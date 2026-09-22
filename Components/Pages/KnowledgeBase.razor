@@ -1,0 +1,128 @@
+@page "/knowledge-base"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using ServicePortal.Data
+@using ServicePortal.Services
+@attribute [Authorize(Policy = "TicketsModule")]
+@inject KnowledgeBaseService KnowledgeBaseService
+
+<PageHeader Title="Knowledge Base" Description="Find answers and guidance before raising a support ticket.">
+    <Actions><AuthorizeView Policy="SupportOrAdministrator"><Authorized><a class="btn btn-outline-primary" href="knowledge-base/manage"><i class="bi bi-pencil-square me-1"></i>Manage articles</a></Authorized></AuthorizeView></Actions>
+</PageHeader>
+
+@if (!string.IsNullOrWhiteSpace(message)) { <div class="alert alert-success">@message</div> }
+
+<div class="card knowledge-base-surface mb-4">
+    <div class="card-header"><div class="ticket-details-heading"><i class="bi bi-book"></i><div><strong>Search the Knowledge Base</strong><div class="small">Find guidance and self-service support articles</div></div></div></div>
+    <div class="card-body">
+        <div class="input-group mb-3"><span class="input-group-text"><i class="bi bi-search"></i></span><input class="form-control" @bind="search" @bind:event="oninput" placeholder="Search for an issue, subject, or tag…" /></div>
+        <div class="row g-3">
+            <div class="col-md-4"><label class="form-label">Software</label><select class="form-select" @bind="softwareFilter"><option value="">All software</option>@foreach (var software in SoftwareOptions) { <option>@software</option> }</select></div>
+            <div class="col-md-4"><label class="form-label">Subcategory</label><select class="form-select" @bind="subcategoryFilter"><option value="">All subcategories</option>@foreach (var subcategory in SubcategoryOptions) { <option>@subcategory</option> }</select></div>
+            <div class="col-md-4"><label class="form-label">Tag</label><select class="form-select" @bind="tagFilter"><option value="">All tags</option>@foreach (var tag in TagOptions) { <option>@tag</option> }</select></div>
+        </div>
+    </div>
+</div>
+
+<div class="knowledge-category-section mb-4">
+    <div class="d-flex justify-content-between align-items-end gap-3 mb-3"><div><h2 class="h5 mb-1">Browse by software</h2><p class="text-muted mb-0 small">Choose a software package to narrow the articles shown below.</p></div>@if (!string.IsNullOrWhiteSpace(softwareFilter)) { <button class="btn btn-sm btn-outline-primary" @onclick="ClearSoftware">Show all</button> }</div>
+    <div class="row g-3">
+        @foreach (var software in SoftwareOptions)
+        {
+            <div class="col-sm-6 col-xl-4">
+                <div class="knowledge-category-card-wrap">
+                    <button type="button" class="knowledge-category-card @(software == softwareFilter ? "selected" : string.Empty)" @onclick="() => SelectSoftware(software)">
+                        <span class="knowledge-category-icon">@if (!string.IsNullOrWhiteSpace(SoftwareImage(software))) { <img src="@SoftwareImage(software)" alt="" /> } else { <i class="bi @SoftwareIcon(software)"></i> }</span>
+                        <span class="knowledge-category-copy"><strong>@software</strong><small>@ArticleCount(software) article@(ArticleCount(software) == 1 ? string.Empty : "s")</small></span>
+                        <i class="bi bi-arrow-right-short knowledge-category-arrow"></i>
+                    </button>
+                    <AuthorizeView Policy="SupportOrAdministrator"><Authorized><label class="knowledge-card-image-upload" title="Change card image"><i class="bi bi-camera"></i><InputFile id="@($"software-image-{software}")" class="visually-hidden" accept="image/png,image/jpeg,image/webp" OnChange="args => UploadSoftwareImageAsync(software, args)" /></label></Authorized></AuthorizeView>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@if (!Filtered.Any())
+{
+    <div class="alert alert-light border">No published articles match your search.</div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card knowledge-base-surface">
+                <div class="card-header"><div class="ticket-details-heading"><i class="bi bi-journals"></i><div><strong>@(string.IsNullOrWhiteSpace(softwareFilter) ? "Knowledge Base articles" : $"{softwareFilter} articles")</strong><div class="small">@Filtered.Count() matching article@(Filtered.Count() == 1 ? string.Empty : "s")</div></div></div></div>
+                <div class="list-group list-group-flush">
+                    @foreach (var article in Filtered)
+                    {
+                        <a class="list-group-item list-group-item-action" href="knowledge-base/article/@article.Id"><div class="d-flex justify-content-between align-items-start gap-2"><strong>@article.Title</strong>@if (IsImported(article)) { <span class="badge bg-secondary">Imported article</span> }</div><div class="small text-muted mt-1">@article.Summary</div><div class="small text-muted mt-2">@article.Tags</div></a>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card knowledge-base-surface"><div class="card-header"><div class="ticket-details-heading"><i class="bi bi-star"></i><div><strong>Popular articles</strong><div class="small">Most viewed support guidance</div></div></div></div><div class="list-group list-group-flush">@foreach (var article in Filtered.OrderByDescending(item => item.ViewCount).Take(5)) { <a class="list-group-item list-group-item-action" href="knowledge-base/article/@article.Id">@article.Title<div class="small text-muted">@article.ViewCount views</div></a> }</div></div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<KnowledgeArticle> articles = [];
+    private List<KnowledgeBaseSoftwareOption> softwareOptions = [];
+    private string search = string.Empty;
+    private string softwareFilter = string.Empty;
+    private string subcategoryFilter = string.Empty;
+    private string tagFilter = string.Empty;
+    private string message = string.Empty;
+
+    private IEnumerable<string> SoftwareOptions => softwareOptions.Select(item => item.Software).Where(item => !string.IsNullOrWhiteSpace(item)).Distinct().Order();
+    private IEnumerable<string> SubcategoryOptions => softwareOptions.Where(item => string.IsNullOrWhiteSpace(softwareFilter) || item.Software == softwareFilter).Select(item => item.Subcategory).Where(item => !string.IsNullOrWhiteSpace(item)).Distinct().Order();
+    private IEnumerable<string> TagOptions => articles.SelectMany(item => item.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)).Distinct(StringComparer.OrdinalIgnoreCase).Order();
+    private IEnumerable<KnowledgeArticle> Filtered => FilteredWithoutCategory;
+    private IEnumerable<KnowledgeArticle> FilteredWithoutCategory => articles.Where(item =>
+        (string.IsNullOrWhiteSpace(search) || ($"{item.Title} {item.Summary} {item.Symptoms} {item.Resolution} {item.Tags}").Contains(search, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(softwareFilter) || item.Software == softwareFilter) &&
+        (string.IsNullOrWhiteSpace(subcategoryFilter) || item.Subcategory == subcategoryFilter) &&
+        (string.IsNullOrWhiteSpace(tagFilter) || item.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Contains(tagFilter, StringComparer.OrdinalIgnoreCase)));
+    private int ArticleCount(string software) => articles.Count(article => article.IsPublished && !article.IsArchived && article.Software == software);
+    private string? SoftwareImage(string software)
+    {
+        var option = softwareOptions.FirstOrDefault(item => item.Software == software && item.ImageContent is { Length: > 0 });
+        return option?.ImageContent is { Length: > 0 } bytes ? $"data:{option.ImageContentType};base64,{Convert.ToBase64String(bytes)}" : null;
+    }
+
+    private void SelectSoftware(string software) => softwareFilter = softwareFilter == software ? string.Empty : software;
+    private void ClearSoftware() => softwareFilter = string.Empty;
+    private async Task UploadSoftwareImageAsync(string software, InputFileChangeEventArgs args)
+    {
+        try
+        {
+            await using var stream = args.File.OpenReadStream(2 * 1024 * 1024);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            await KnowledgeBaseService.SaveSoftwareImageAsync(software, memory.ToArray(), args.File.ContentType);
+            softwareOptions = await KnowledgeBaseService.GetSoftwareOptionsAsync();
+            message = $"{software} card image updated.";
+        }
+        catch (Exception ex) { message = ex.Message; }
+    }
+    private static string SoftwareIcon(string software) => software.ToLowerInvariant() switch
+    {
+        "ecert" => "bi-patch-check",
+        "econsign" => "bi-box-seam",
+        "egta" => "bi-globe2",
+        "ukcs portal" => "bi-window-stack",
+        _ => "bi-grid"
+    };
+    private static bool IsImported(KnowledgeArticle article) => article.Category?.Name == "Imported articles" || article.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Contains("Imported", StringComparer.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await KnowledgeBaseService.EnsureDefaultsAsync();
+        softwareOptions = await KnowledgeBaseService.GetSoftwareOptionsAsync();
+        articles = await KnowledgeBaseService.GetArticlesAsync();
+    }
+}

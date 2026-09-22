@@ -1,0 +1,49 @@
+.language-option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+}
+
+.language-option .form-check-input {
+    margin: 0;
+}
+
+.language-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.language-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.35rem 0.25rem 0.55rem;
+    border-radius: 999px;
+    color: #24563a;
+    background: #e3f4e9;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.language-tag button {
+    width: 1.25rem;
+    height: 1.25rem;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: inherit;
+    background: transparent;
+}
+
+.language-tag button:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+html.dark-mode .language-tag {
+    color: #bfe8cd;
+    background: #244132;
+}

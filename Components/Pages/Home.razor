@@ -1,0 +1,858 @@
+@page "/"
+
+@rendermode InteractiveServer
+
+@using ServicePortal.Models
+@using ServicePortal.Data
+@using ServicePortal.Services
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+
+@inject NavigationManager Navigation
+@inject TicketService TicketService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationService AuthorizationService
+@inject OnboardingService OnboardingService
+@inject TestingService TestingService
+@inject ExistingCustomerService ExistingCustomerService
+@inject NotificationService NotificationService
+
+<PageTitle>Dashboard</PageTitle>
+
+<div class="dashboard-container">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div>
+            <h1 class="mb-1">Dashboard</h1>
+            <p class="text-muted mb-0">An overview of the modules available to you.</p>
+        </div>
+        @if (hasTicketsModule)
+        {
+            <button class="btn btn-primary dashboard-page-action" @onclick="CreateTicket"><i class="bi bi-plus-lg me-2"></i>Create Ticket</button>
+        }
+    </div>
+</div>
+
+<AuthorizeView Policy="TicketsModule">
+    <Authorized>
+        <div class="dashboard-container">
+            <div class="dashboard-module-heading mb-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="dashboard-module-icon">
+                        <i class="bi bi-ticket-perforated"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h2 class="h4 mb-0">Support Tickets</h2>
+                            <span class="badge bg-success">Enabled</span>
+                        </div>
+                        <p class="text-muted mb-0 mt-1">
+                            Current workload, recent activity and quick actions.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+
+        <!-- Total -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card dashboard-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+                            <div class="text-muted small text-uppercase fw-semibold">
+                                Total Tickets
+                            </div>
+
+                            <div class="display-5 fw-bold mt-2">
+                                @tickets.Count
+                            </div>
+                        </div>
+
+                        <div class="dashboard-icon bg-primary">
+                            <i class="bi bi-ticket-perforated"></i>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Open -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card dashboard-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+                            <div class="text-muted small text-uppercase fw-semibold">
+                                Open Tickets
+                            </div>
+
+                            <div class="display-5 fw-bold text-success mt-2">
+                                @OpenTickets
+                            </div>
+                        </div>
+
+                        <div class="dashboard-icon bg-success">
+                            <i class="bi bi-folder2-open"></i>
+                        </div>
+
+                    </div>
+
+                    <button class="btn btn-sm btn-outline-success mt-3"
+                            @onclick="OpenOpenTickets">
+                        View open tickets
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Closed -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card dashboard-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+                            <div class="text-muted small text-uppercase fw-semibold">
+                                Closed Tickets
+                            </div>
+
+                            <div class="display-5 fw-bold text-secondary mt-2">
+                                @ClosedTickets
+                            </div>
+                        </div>
+
+                        <div class="dashboard-icon bg-secondary">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+
+                    </div>
+
+                    <button class="btn btn-sm btn-outline-secondary mt-3"
+                            @onclick="OpenClosedTickets">
+                        View closed tickets
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- High Priority -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card dashboard-stat-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+
+                        <div>
+                            <div class="text-muted small text-uppercase fw-semibold">
+                                High Priority
+                            </div>
+
+                            <div class="display-5 fw-bold text-danger mt-2">
+                                @HighPriorityTickets
+                            </div>
+                        </div>
+
+                        <div class="dashboard-icon bg-danger">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+
+                    </div>
+
+                    <div class="mt-3 small text-muted">
+                        @CriticalOpenText
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Main Dashboard -->
+    <div class="row g-4 mb-4">
+
+        <!-- Ticket Categories -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+
+                <div class="card-header bg-transparent">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <strong>
+                            <i class="bi bi-folder me-2"></i>
+                            Tickets by Category
+                        </strong>
+
+                        <span class="text-muted small">
+                            @tickets.Count total
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card-body">
+
+                    @foreach (var category in categories)
+                    {
+                        var count = tickets.Count(t =>
+                            string.Equals(
+                                t.Category,
+                                category,
+                                StringComparison.OrdinalIgnoreCase));
+
+                        var percentage = tickets.Count == 0
+                            ? 0
+                            : (count * 100) / tickets.Count;
+
+                        <div class="mb-4">
+
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="fw-semibold">
+                                    @category
+                                </span>
+
+                                <span class="text-muted">
+                                    @count
+                                </span>
+                            </div>
+
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar"
+                                     role="progressbar"
+                                     style="width: @percentage%">
+                                </div>
+                            </div>
+
+                        </div>
+                    }
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Assigned Users -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+
+                <div class="card-header bg-transparent">
+                    <strong>
+                        <i class="bi bi-people me-2"></i>
+                        Tickets by Assigned User
+                    </strong>
+                </div>
+
+                <div class="card-body">
+
+                    @foreach (var user in supportUsers)
+                    {
+                        var count = tickets.Count(t =>
+                            string.Equals(
+                                string.IsNullOrWhiteSpace(t.AssignedTo)
+                                    ? "Unassigned"
+                                    : t.AssignedTo,
+                                user,
+                                StringComparison.OrdinalIgnoreCase));
+
+                        <div class="d-flex justify-content-between align-items-center border-bottom py-3">
+
+                            <div>
+                                @if (user == "Unassigned")
+                                {
+                                    <i class="bi bi-person-dash text-muted me-2"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-person text-primary me-2"></i>
+                                }
+
+                                <span>@user</span>
+                            </div>
+
+                            <span class="badge bg-primary rounded-pill">
+                                @count
+                            </span>
+
+                        </div>
+                    }
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Recent Tickets -->
+    <div class="card mb-4">
+
+        <div class="card-header bg-transparent">
+            <div class="d-flex justify-content-between align-items-center">
+
+                <strong>
+                    <i class="bi bi-clock-history me-2"></i>
+                    Recent Tickets
+                </strong>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-success"
+                            @onclick="OpenOpenTickets">
+                        Open Tickets
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            @onclick="OpenClosedTickets">
+                        Closed Tickets
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+
+            @if (!recentTickets.Any())
+            {
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                    No tickets have been created yet.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+
+                    <table class="table table-hover mb-0 align-middle">
+
+                        <thead class="table-light">
+                            <tr>
+                                <th>Ticket</th>
+                                <th>Description</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Category</th>
+                                <th>Assigned To</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var ticket in recentTickets)
+                            {
+                                <tr @onclick="() => OpenTicket(ticket.TicketNumber)"
+                                    style="cursor: pointer;">
+
+                                    <td>
+                                        <strong class="text-primary">
+                                            #@(string.IsNullOrWhiteSpace(ticket.TicketReference) ? $"#{ticket.TicketNumber}" : ticket.TicketReference)
+                                        </strong>
+                                    </td>
+
+                                    <td>
+                                        <div class="text-truncate"
+                                             style="max-width: 300px;">
+                                            @(string.IsNullOrWhiteSpace(ticket.Description)
+                                                ? "No description"
+                                                : ticket.Description)
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        @if (ticket.Priority == "High")
+                                        {
+                                            <span class="badge bg-danger">
+                                                High
+                                            </span>
+                                        }
+                                        else if (ticket.Priority == "Medium")
+                                        {
+                                            <span class="badge bg-warning text-dark">
+                                                Medium
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">
+                                                Low
+                                            </span>
+                                        }
+                                    </td>
+
+                                    <td>
+                                        @if (ticket.Status == "Open")
+                                        {
+                                            <span class="badge bg-success">
+                                                Open
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">
+                                                Closed
+                                            </span>
+                                        }
+                                    </td>
+
+                                    <td>
+                                        @ticket.Category
+                                    </td>
+
+                                    <td>
+                                        @(string.IsNullOrWhiteSpace(ticket.AssignedTo)
+                                            ? "Unassigned"
+                                            : ticket.AssignedTo)
+                                    </td>
+
+                                    <td>
+                                        <span class="text-muted">
+                                            @ticket.CreatedDate.ToString("dd/MM/yyyy")
+                                        </span>
+                                    </td>
+
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+            }
+
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card mb-4">
+
+        <div class="card-header bg-transparent">
+            <strong>
+                <i class="bi bi-lightning-charge me-2"></i>
+                Quick Actions
+            </strong>
+        </div>
+
+        <div class="card-body">
+
+            <div class="row g-3">
+
+                <div class="col-md-3">
+                    <button class="btn btn-primary w-100 py-3"
+                            @onclick="CreateTicket">
+                        <i class="bi bi-plus-circle fs-5 d-block mb-1"></i>
+                        Create Ticket
+                    </button>
+                </div>
+
+                <div class="col-md-3">
+                    <button class="btn btn-outline-success w-100 py-3"
+                            @onclick="OpenOpenTickets">
+                        <i class="bi bi-folder2-open fs-5 d-block mb-1"></i>
+                        Open Tickets
+                    </button>
+                </div>
+
+                <div class="col-md-3">
+                    <button class="btn btn-outline-secondary w-100 py-3"
+                            @onclick="OpenClosedTickets">
+                        <i class="bi bi-check-circle fs-5 d-block mb-1"></i>
+                        Closed Tickets
+                    </button>
+                </div>
+
+                <div class="col-md-3">
+                    <button class="btn btn-outline-dark w-100 py-3"
+                            @onclick="OpenReports">
+                        <i class="bi bi-bar-chart fs-5 d-block mb-1"></i>
+                        Reports
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+        </div>
+
+    </Authorized>
+    <NotAuthorized>
+        <AuthorizeView Policy="OnboardingModule" Context="onboardingAccess">
+            <NotAuthorized>
+                <AuthorizeView Policy="TestingModule">
+                    <NotAuthorized Context="testingAccess">
+                        <div class="dashboard-container">
+                            <div class="mb-4">
+                                <h1 class="mb-1">Dashboard</h1>
+                                <p class="text-muted mb-0">Your available modules will appear here.</p>
+                            </div>
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-body p-5 text-center">
+                                    <div class="dashboard-empty-icon mx-auto mb-3"><i class="bi bi-grid"></i></div>
+                                    <h2 class="h4">No modules assigned</h2>
+                                    <p class="text-muted mb-0">Please contact an Administrator if you need access to a module.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </NotAuthorized>
+        </AuthorizeView>
+    </NotAuthorized>
+</AuthorizeView>
+
+<AuthorizeView Policy="TestingModule">
+    <Authorized>
+        <div class="dashboard-container onboarding-dashboard-section">
+            <div class="dashboard-module-heading mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="dashboard-module-icon bg-warning"><i class="bi bi-clipboard2-check"></i></div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2"><h2 class="h4 mb-0">Testing</h2><span class="badge bg-warning text-dark">Enabled</span></div>
+                            <p class="text-muted mb-0 mt-1">Monthly quality checks and recorded test results.</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-primary" @onclick="OpenTesting">Open Testing</button>
+                </div>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-3"><div class="card dashboard-stat-card h-100"><div class="card-body"><div class="text-muted small text-uppercase fw-semibold">Scheduled</div><div class="display-6 fw-bold">@testRuns.Count</div></div></div></div>
+                <div class="col-md-3"><div class="card dashboard-stat-card h-100"><div class="card-body"><div class="text-muted small text-uppercase fw-semibold">In Progress</div><div class="display-6 fw-bold">@testRuns.Count(run => run.Status == "In Progress")</div></div></div></div>
+                <div class="col-md-3"><div class="card dashboard-stat-card h-100"><div class="card-body"><div class="text-muted small text-uppercase fw-semibold">Passed</div><div class="display-6 fw-bold">@testRuns.Count(run => run.Status == "Pass")</div></div></div></div>
+                <div class="col-md-3"><div class="card dashboard-stat-card h-100"><div class="card-body"><div class="text-muted small text-uppercase fw-semibold">Failed</div><div class="display-6 fw-bold">@testRuns.Count(run => run.Status == "Fail")</div></div></div></div>
+            </div>
+            @if (activeTestingWindows.Count > 0)
+            {
+                <div class="card mt-4">
+                    <div class="card-header fw-semibold"><i class="bi bi-window-stack me-2"></i>Active releases</div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var release in activeTestingWindows)
+                        {
+                            <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center text-start" @onclick="OpenTesting"><span><strong>@release.Product</strong><span class="text-muted ms-2">Release @release.ReleaseNumber</span></span><span class="badge @(release.Status == "Ready for live" ? "text-bg-success" : "text-bg-warning")">@release.Status</span></button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+<AuthorizeView Policy="OnboardingModule">
+    <Authorized>
+        <div class="dashboard-container onboarding-dashboard-section">
+            <div class="dashboard-module-heading onboarding-module-heading mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="dashboard-module-icon bg-success">
+                            <i class="bi bi-person-check"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <h2 class="h4 mb-0">Customer Onboarding</h2>
+                                <span class="badge bg-success">Enabled</span>
+                            </div>
+                            <p class="text-muted mb-0 mt-1">
+                                Customer implementations, go-live dates and checklist progress.
+                            </p>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-outline-primary" @onclick="OpenOnboarding">
+                        Open Onboarding
+                    </button>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-xl-3 col-md-6">
+                    <div class="card dashboard-stat-card h-100">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-muted small text-uppercase fw-semibold">Active</div>
+                                <div class="display-6 fw-bold">@ActiveOnboardings</div>
+                            </div>
+                            <div class="dashboard-icon bg-primary">
+                                <i class="bi bi-rocket-takeoff"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card dashboard-stat-card h-100">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-muted small text-uppercase fw-semibold">Due Soon</div>
+                                <div class="display-6 fw-bold">@OnboardingsDueSoon</div>
+                            </div>
+                            <div class="dashboard-icon bg-warning">
+                                <i class="bi bi-calendar-event"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card dashboard-stat-card h-100">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-muted small text-uppercase fw-semibold">Completed</div>
+                                <div class="display-6 fw-bold">@CompletedOnboardings</div>
+                            </div>
+                            <div class="dashboard-icon bg-success">
+                                <i class="bi bi-check2-circle"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong><i class="bi bi-arrow-repeat me-2"></i>Upcoming Renewals</strong>
+                    <span class="text-muted small">Next 30 days</span>
+                </div>
+                @if (upcomingRenewals.Count == 0)
+                {
+                    <div class="card-body text-center text-muted">No customer renewals are due in the next 30 days.</div>
+                }
+                else
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var customer in upcomingRenewals)
+                        {
+                            <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center text-start" @onclick="() => OpenExistingCustomer(customer.Id)">
+                                <span><strong>@customer.CustomerName</strong><span class="text-muted ms-2">@customer.ProjectNumber</span></span>
+                                <span class="badge text-bg-warning">@customer.RenewalDate?.ToString("dd/MM/yyyy")</span>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>
+                        <i class="bi bi-people me-2"></i>
+                        Current Customer Onboardings
+                    </strong>
+                </div>
+
+                @if (customerOnboardings.Count == 0)
+                {
+                    <div class="card-body p-4 text-center text-muted">
+                        No customer onboardings have been created yet.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Customer</th>
+                                    <th>Software</th>
+                                    <th>Go-live</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in customerOnboardings.Take(5))
+                                {
+                                    <tr style="cursor: pointer;" @onclick="() => OpenOnboarding(item.Id)">
+                                        <td><strong>@item.CustomerName</strong></td>
+                                        <td>@item.ProductsPurchased</td>
+                                        <td>@item.TargetGoLiveDate.ToString("dd/MM/yyyy")</td>
+                                        <td>
+                                            <span class="badge @OnboardingStatusBadge(item.Status)">@item.Status</span>
+                                        </td>
+                                        <td style="min-width: 150px;">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="progress flex-grow-1" style="height: 7px;">
+                                                    <div class="progress-bar bg-success"
+                                                         style="@($"width: {item.ProgressPercent}%")"></div>
+                                                </div>
+                                                <span class="small text-muted">@item.ProgressPercent%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+@code
+{
+    private List<Ticket> tickets = new();
+
+    private List<CustomerOnboarding> customerOnboardings = new();
+    private List<ExistingCustomer> upcomingRenewals = new();
+
+    private List<TestRun> testRuns = new();
+    private List<TestingWindow> activeTestingWindows = new();
+
+    private bool hasTicketsModule;
+    private bool hasOnboardingModule;
+
+    private readonly List<string> categories = new()
+    {
+        "eCERT",
+        "eCONSIGN",
+        "eGTA",
+        "UKCS Portal"
+    };
+
+    private List<string> supportUsers = [];
+
+    private IEnumerable<Ticket> recentTickets =>
+        tickets
+            .OrderByDescending(t => t.CreatedDate)
+            .Take(5);
+
+    private int OpenTickets =>
+        tickets.Count(t => t.Status == "Open");
+
+    private int ClosedTickets =>
+        tickets.Count(t => t.Status == "Closed");
+
+    private int HighPriorityTickets =>
+        tickets.Count(t => t.Priority == "High");
+
+    private int OpenHighPriorityTickets =>
+        tickets.Count(t =>
+            t.Status == "Open" &&
+            t.Priority == "High");
+
+    private int ActiveOnboardings =>
+        customerOnboardings.Count(item => item.Status != "Complete");
+
+    private int BlockedOnboardings =>
+        customerOnboardings.Count(item => item.Status == "Blocked");
+
+    private int CompletedOnboardings =>
+        customerOnboardings.Count(item => item.Status == "Complete");
+
+    private int OnboardingsDueSoon => customerOnboardings.Count(item =>
+        item.Status != "Complete" &&
+        item.TargetGoLiveDate.Date <= DateTime.Today.AddDays(14));
+
+    private string CriticalOpenText =>
+        OpenHighPriorityTickets == 1
+            ? "1 high-priority ticket is currently open"
+            : $"{OpenHighPriorityTickets} high-priority tickets are currently open";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState =
+            await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        var ticketAccess = await AuthorizationService.AuthorizeAsync(
+            authState.User,
+            "TicketsModule");
+
+        hasTicketsModule = ticketAccess.Succeeded;
+
+        var onboardingAccess = await AuthorizationService.AuthorizeAsync(
+            authState.User,
+            "OnboardingModule");
+        hasOnboardingModule = onboardingAccess.Succeeded;
+
+        var testingAccess = await AuthorizationService.AuthorizeAsync(
+            authState.User,
+            "TestingModule");
+
+        if (ticketAccess.Succeeded)
+        {
+            await TicketService.LoadAsync();
+
+            tickets = TicketService
+                .GetTickets()
+                .ToList();
+            supportUsers = await TicketService.GetAssignableUserDisplayNamesAsync();
+        }
+
+        if (onboardingAccess.Succeeded)
+        {
+            customerOnboardings = await OnboardingService.GetAllAsync();
+            upcomingRenewals = (await ExistingCustomerService.GetAllAsync())
+                .Where(customer => customer.Status == "Active" && customer.RenewalDate is not null && customer.RenewalDate.Value.Date >= DateTime.Today && customer.RenewalDate.Value.Date <= DateTime.Today.AddDays(30))
+                .OrderBy(customer => customer.RenewalDate)
+                .ToList();
+            await NotificationService.CreateUpcomingRenewalNotificationsAsync(upcomingRenewals);
+        }
+
+        if (testingAccess.Succeeded)
+        {
+            testRuns = await TestingService.GetRunsAsync(DateTime.Today);
+            activeTestingWindows = await TestingService.GetWindowsAsync(false);
+        }
+    }
+
+    private void CreateTicket()
+    {
+        Navigation.NavigateTo("tickets/new");
+    }
+
+    private void OpenOpenTickets()
+    {
+        Navigation.NavigateTo("opentickets");
+    }
+
+    private void OpenClosedTickets()
+    {
+        Navigation.NavigateTo("closedtickets");
+    }
+
+    private void OpenReports()
+    {
+        Navigation.NavigateTo("reports");
+    }
+
+    private void OpenTicket(int ticketNumber)
+    {
+        Navigation.NavigateTo($"ticket/{ticketNumber}");
+    }
+
+    private void OpenExistingCustomer(int id)
+    {
+        Navigation.NavigateTo($"existing-customers/{id}");
+    }
+
+    private void CreateOnboarding()
+    {
+        Navigation.NavigateTo("onboarding");
+    }
+
+    private void OpenOnboarding()
+    {
+        Navigation.NavigateTo("onboarding");
+    }
+
+    private void OpenOnboarding(int id)
+    {
+        Navigation.NavigateTo($"onboarding/{id}");
+    }
+
+    private void OpenTesting()
+    {
+        Navigation.NavigateTo("testing");
+    }
+
+    private static string OnboardingStatusBadge(string status) => status switch
+    {
+        "Complete" => "bg-success",
+        "Blocked" => "bg-danger",
+        "In Progress" => "bg-primary",
+        _ => "bg-secondary"
+    };
+}
+
+
+

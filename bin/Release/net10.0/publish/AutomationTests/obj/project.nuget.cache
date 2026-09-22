@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "dgSpecHash": "XFMyS0WAn1A=",
+  "success": true,
+  "projectFilePath": "c:\\Users\\Ben_lear\\Documents\\ServicePortal\\ServicePortal\\bin\\Release\\net10.0\\publish\\AutomationTests\\ServicePortal.AutomationTests.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.applicationinsights\\2.23.0\\microsoft.applicationinsights.2.23.0.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.bcl.asyncinterfaces\\6.0.0\\microsoft.bcl.asyncinterfaces.6.0.0.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.codecoverage\\17.14.1\\microsoft.codecoverage.17.14.1.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.net.test.sdk\\17.14.1\\microsoft.net.test.sdk.17.14.1.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.playwright\\1.56.0\\microsoft.playwright.1.56.0.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.playwright.nunit\\1.56.0\\microsoft.playwright.nunit.1.56.0.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.playwright.testadapter\\1.56.0\\microsoft.playwright.testadapter.1.56.0.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.testing.extensions.telemetry\\1.7.3\\microsoft.testing.extensions.telemetry.1.7.3.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.testing.extensions.trxreport.abstractions\\1.7.3\\microsoft.testing.extensions.trxreport.abstractions.1.7.3.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.testing.extensions.vstestbridge\\1.7.3\\microsoft.testing.extensions.vstestbridge.1.7.3.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.testing.platform\\1.7.3\\microsoft.testing.platform.1.7.3.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.testing.platform.msbuild\\1.7.3\\microsoft.testing.platform.msbuild.1.7.3.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.testplatform.adapterutilities\\17.13.0\\microsoft.testplatform.adapterutilities.17.13.0.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.testplatform.objectmodel\\17.14.1\\microsoft.testplatform.objectmodel.17.14.1.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\microsoft.testplatform.testhost\\17.14.1\\microsoft.testplatform.testhost.17.14.1.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\nunit\\4.4.0\\nunit.4.4.0.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\nunit3testadapter\\5.1.0\\nunit3testadapter.5.1.0.nupkg.sha512",
+    "C:\\Users\\Ben_lear\\.nuget\\packages\\system.componentmodel.annotations\\5.0.0\\system.componentmodel.annotations.5.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

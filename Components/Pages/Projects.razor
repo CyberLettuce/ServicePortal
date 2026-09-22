@@ -1,0 +1,47 @@
+@page "/projects"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using ServicePortal.Data
+@using ServicePortal.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@attribute [Authorize(Policy = "ProjectsModule")]
+@inject ProjectService ProjectService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager Navigation
+
+<PageHeader Title="Projects" Description="Track delivery, decisions, risks, and progress in one place.">
+    <button class="btn btn-primary" @onclick="() => showCreate = !showCreate"><i class="bi bi-plus-lg me-2"></i>@(showCreate ? "Cancel" : "New Project")</button>
+</PageHeader>
+@if (showCreate)
+{
+    <div class="card mb-4"><div class="card-header"><strong>Create project</strong></div><div class="card-body">
+        <EditForm Model="newProject" OnValidSubmit="CreateAsync"><DataAnnotationsValidator /><ValidationSummary class="text-danger mb-3" />
+            <div class="row g-3"><div class="col-md-6"><label class="form-label">Project name</label><InputText class="form-control" @bind-Value="newProject.Name" /></div>
+            <div class="col-md-6"><label class="form-label">Project owner</label><InputText class="form-control" @bind-Value="newProject.Owner" /></div>
+            <div class="col-md-6"><label class="form-label">Project lead</label><InputText class="form-control" @bind-Value="newProject.ProjectLead" /></div>
+            <div class="col-md-6"><label class="form-label">Developer</label><InputText class="form-control" @bind-Value="newProject.Developer" /></div>
+            <div class="col-12"><label class="form-label">Description</label><InputTextArea class="form-control" @bind-Value="newProject.Description" /></div>
+            <div class="col-md-4"><label class="form-label">Status</label><InputSelect class="form-select" @bind-Value="newProject.Status"><option>Pending</option><option>On Track</option><option>At Risk</option><option>Off Track</option><option>Completed</option><option>Paused</option><option>Cancelled</option></InputSelect></div>
+            <div class="col-md-4"><label class="form-label">Start date</label><InputDate class="form-control" @bind-Value="newProject.StartDate" /></div>
+            <div class="col-md-4"><label class="form-label">Target date</label><InputDate class="form-control" @bind-Value="newProject.TargetDate" /></div></div>
+            <button class="btn btn-primary mt-4" type="submit">Create project</button>
+        </EditForm>
+    </div></div>
+}
+<div class="card mb-4"><div class="card-body d-flex gap-2 flex-wrap"><span class="fw-semibold me-2">Show</span><button class="btn @(filter == "All" ? "btn-primary" : "btn-outline-primary")" @onclick='() => filter = "All"'>All Projects</button><button class="btn @(filter == "Mine" ? "btn-primary" : "btn-outline-primary")" @onclick='() => filter = "Mine"'>Your Projects</button></div></div>
+@if (filteredProjects.Count == 0) { <div class="card"><div class="card-body p-5 text-center text-muted">There are no projects to show.</div></div> }
+else { <div class="row g-3">@foreach (var project in filteredProjects) { <div class="col-md-6 col-xl-4"><button class="card h-100 w-100 text-start project-card" @onclick='() => Navigation.NavigateTo("projects/" + project.Id)'>@if(!string.IsNullOrWhiteSpace(project.ImageFileName)){<img class="card-img-top project-card-image" src="uploads/project-images/@project.ImageFileName" alt="@project.Name" />}<div class="card-body"><div class="d-flex justify-content-between gap-2"><h2 class="h5">@project.Name</h2><span class="badge @StatusClass(project.Status)">@project.Status</span></div><p class="text-muted small">@project.Description</p><div class="small"><i class="bi bi-person me-2"></i>@project.Owner</div><div class="small text-muted mt-2"><i class="bi bi-calendar3 me-2"></i>Target @(project.TargetDate?.ToString("dd/MM/yyyy") ?? "Not set")</div><div class="small text-muted mt-2"><i class="bi bi-chat-left-text me-2"></i>@project.Updates.Count update@(project.Updates.Count == 1 ? "" : "s")</div></div></button></div> }</div> }
+
+@code {
+    private List<Project> projects = new(); private Project newProject = new() { Status = "Pending", StartDate = DateTime.Today }; private string filter = "All"; private string currentUser = string.Empty; private bool showCreate;
+    private List<Project> filteredProjects => filter == "Mine" ? projects.Where(project => string.Equals(project.Owner, currentUser, StringComparison.OrdinalIgnoreCase)).ToList() : projects;
+    protected override async Task OnInitializedAsync() { var state = await AuthenticationStateProvider.GetAuthenticationStateAsync(); var user = await UserManager.GetUserAsync(state.User); currentUser = user?.DisplayName ?? user?.Email ?? ""; newProject.Owner = currentUser; projects = await ProjectService.GetAllAsync(); }
+    private async Task CreateAsync() { var id = await ProjectService.CreateAsync(newProject, currentUser); Navigation.NavigateTo("projects/" + id); }
+    private static string StatusClass(string status) => status switch { "On Track" or "Completed" or "Complete" => "text-bg-success", "At Risk" or "On Hold" => "text-bg-warning", "Off Track" or "Cancelled" => "text-bg-danger", "Paused" => "text-bg-info", "In Progress" => "text-bg-primary", _ => "text-bg-secondary" };
+    private sealed class ProjectInput { [Required] public string Name { get; set; } = string.Empty; }
+}
+
+

@@ -1,0 +1,99 @@
+@page "/audit-log"
+
+@using ServicePortal.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@attribute [Authorize(Policy = "SupportOrAdministrator")]
+
+@inject ApplicationDbContext Db
+
+<PageTitle>Audit Log</PageTitle>
+
+<h1>Audit Log</h1>
+
+<p class="text-muted">
+    Recent user-management activity. Times are shown in UTC.
+</p>
+
+@if (isLoading)
+{
+    <div class="p-4 text-center">
+        <div class="spinner-border spinner-border-sm me-2"
+             role="status">
+        </div>
+        Loading audit log...
+    </div>
+}
+else if (entries.Count == 0)
+{
+    <div class="alert alert-secondary">
+        No audit activity has been recorded yet.
+    </div>
+}
+else
+{
+    <div class="card mt-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Recent activity</strong>
+            <span class="badge bg-secondary">
+                Latest @entries.Count entries
+            </span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Time (UTC)</th>
+                        <th>Administrator</th>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in entries)
+                    {
+                        <tr>
+                            <td class="text-nowrap">
+                                @entry.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss")
+                            </td>
+                            <td>@entry.ActorEmail</td>
+                            <td>
+                                <span class="badge bg-primary">
+                                    @entry.Action
+                                </span>
+                            </td>
+                            <td>@entry.TargetEmail</td>
+                            <td>@entry.Details</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code
+{
+    private List<ServicePortal.Data.AuditLog> entries = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            entries = await Db.AuditLogs
+                .AsNoTracking()
+                .OrderByDescending(entry => entry.CreatedAt)
+                .Take(250)
+                .ToListAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
+

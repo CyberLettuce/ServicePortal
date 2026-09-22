@@ -1,0 +1,53 @@
+@using System.Text.RegularExpressions
+@using ServicePortal.Models
+@using ServicePortal.Services
+@implements IDisposable
+@inject NavigationManager Navigation
+@inject ProjectService ProjectService
+
+@if (isProjectPage)
+{
+    <div class="card mt-4 project-linked-tickets">
+        <div class="card-header project-section-header"><strong><i class="bi bi-ticket-perforated me-2"></i>Linked Tickets</strong></div>
+        <div class="list-group list-group-flush">
+            @if (tickets.Count == 0)
+            {
+                <div class="list-group-item text-muted">No tickets are linked to this project yet.</div>
+            }
+            else
+            {
+                @foreach (var ticket in tickets)
+                {
+                    <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-3 text-start" @onclick='() => Navigation.NavigateTo($"ticket/{ticket.TicketNumber}")'>
+                        <span><strong>@(string.IsNullOrWhiteSpace(ticket.TicketReference) ? $"#{ticket.TicketNumber}" : ticket.TicketReference)</strong><span class="ms-2">@ticket.Description</span></span>
+                        <span class="badge @(ticket.Status == "Closed" ? "bg-secondary" : "bg-success")">@ticket.Status</span>
+                    </button>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool isProjectPage;
+    private List<Ticket> tickets = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        await LoadAsync();
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs args) => await InvokeAsync(LoadAsync);
+
+    private async Task LoadAsync()
+    {
+        var match = Regex.Match(Navigation.ToBaseRelativePath(Navigation.Uri), "^projects/(\\d+)$", RegexOptions.IgnoreCase);
+        var projectId = 0;
+        isProjectPage = match.Success && int.TryParse(match.Groups[1].Value, out projectId);
+        tickets = isProjectPage ? await ProjectService.GetLinkedTicketsAsync(projectId) : [];
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

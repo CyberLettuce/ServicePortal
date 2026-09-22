@@ -1,0 +1,267 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using ServicePortal.Data
+@inherits LayoutComponentBase
+@implements IDisposable
+
+@inject ServicePortal.Services.NotificationService NotificationService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JS
+@inject ServicePortal.Services.SettingsService SettingsService
+
+<div class="page @(sidebarCollapsed ? "sidebar-is-collapsed" : string.Empty) @(isReadOnly ? "read-only" : string.Empty)" @onclick="CloseAccountMenu">
+    <div class="sidebar @(sidebarCollapsed ? "collapsed" : string.Empty)">
+        <NavMenu />
+        <button type="button"
+                class="sidebar-collapse-button sidebar-collapse-bottom"
+                title="@(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")"
+                @onclick="ToggleSidebar">
+            <i class="bi @(sidebarCollapsed ? "bi-chevron-right" : "bi-chevron-left")"></i>
+        </button>
+    </div>
+
+    <main>
+<div class="top-row px-4 d-flex align-items-center gap-3">
+
+    <div class="ms-auto">
+
+<AuthorizeView>
+
+    <Authorized Context="authContext">
+
+        @{
+            var user = authContext.User;
+
+            var displayName =
+                user.FindFirst("DisplayName")?.Value
+                ?? user.Identity?.Name
+                ?? "User";
+        }
+
+        <div class="d-flex align-items-center gap-2">
+
+            <div class="notification-menu" @onclick:stopPropagation="true">
+                <button type="button"
+                        class="btn btn-link notification-bell"
+                        title="Notifications"
+                        @onclick="ToggleNotificationsAsync">
+                    <i class="bi bi-bell fs-5"></i>
+                    @if (unreadNotificationCount > 0)
+                    {
+                        <span class="notification-count">@unreadNotificationCount</span>
+                    }
+                </button>
+
+                @if (showNotifications)
+                {
+                    <div class="notification-panel shadow">
+                        <div class="notification-panel-header">
+                            <strong>Notifications</strong>
+                            @if (unreadNotificationCount > 0)
+                            {
+                                <button type="button"
+                                        class="btn btn-sm btn-link"
+                                        @onclick="MarkAllAsReadAsync">
+                                    Mark all as read
+                                </button>
+                            }
+                        </div>
+
+                        @if (notifications.Count == 0)
+                        {
+                            <div class="notification-empty">You have no notifications.</div>
+                        }
+                        else
+                        {
+                            @foreach (var notification in notifications)
+                            {
+                                <div class="notification-item @(notification.IsRead ? "read" : "unread")">
+                                    <button type="button"
+                                            class="notification-link"
+                                            @onclick="() => OpenNotificationAsync(notification)">
+                                        <span>@notification.Message</span>
+                                        <small>@notification.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
+                                    </button>
+                                    @if (!notification.IsRead)
+                                    {
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                title="Mark as read"
+                                                @onclick="() => MarkAsReadAsync(notification)">
+                                            <i class="bi bi-check2"></i>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="account-menu" @onclick:stopPropagation="true">
+                <button type="button"
+                        class="account-menu-trigger"
+                        aria-expanded="@showAccountMenu"
+                        @onclick="ToggleAccountMenu">
+                    <i class="bi bi-person-circle fs-5"></i>
+                    <span>@displayName</span>
+                    <i class="bi bi-chevron-down small"></i>
+                </button>
+
+                @if (showAccountMenu)
+                {
+                    <div class="account-menu-panel shadow">
+                        <a href="Account/ChangePassword">
+                            <i class="bi bi-key me-2"></i>Change password
+                        </a>
+                        <form method="post" action="Account/Logout">
+                            <AntiforgeryToken />
+                            <button type="submit" class="account-menu-action">
+                                <i class="bi bi-box-arrow-right me-2"></i>Logout
+                            </button>
+                        </form>
+                    </div>
+                }
+            </div>
+
+            @if (user.IsInRole("Administrator"))
+            {
+                <span class="badge bg-secondary">
+                    Admin
+                </span>
+            }
+
+        </div>
+
+    </Authorized>
+
+    <NotAuthorized>
+        <a href="Account/Login">
+            <i class="bi bi-box-arrow-in-right me-1"></i>
+            Sign in
+        </a>
+    </NotAuthorized>
+
+</AuthorizeView>
+
+</div>
+</div>
+
+        <article class="content px-4">
+            @Body
+            <ProjectTicketsPanel />
+        </article>
+    </main>
+</div>
+
+@code {
+    private bool sidebarCollapsed;
+    private bool showNotifications;
+    private bool showAccountMenu;
+    private int unreadNotificationCount;
+    private List<Notification> notifications = [];
+    private Timer? notificationRefreshTimer;
+    private bool isReadOnly;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isReadOnly = authenticationState.User.IsInRole("ReadOnly");
+    }
+
+    private void ToggleSidebar() => sidebarCollapsed = !sidebarCollapsed;
+    private void ToggleAccountMenu() => showAccountMenu = !showAccountMenu;
+    private void CloseAccountMenu()
+    {
+        showAccountMenu = false;
+        showNotifications = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await SettingsService.LoadAsync();
+            await SettingsService.ApplyAppearanceAsync();
+            await JS.InvokeVoidAsync("servicePortal.setReadOnlyMode", isReadOnly);
+            await LoadNotificationsAsync();
+            await InvokeAsync(StateHasChanged);
+
+            notificationRefreshTimer = new Timer(
+                async _ =>
+                {
+                    try
+                    {
+                        await InvokeAsync(async () =>
+                        {
+                            await LoadNotificationsAsync();
+                            StateHasChanged();
+                        });
+                    }
+                    catch
+                    {
+                        // The browser may have disconnected while the timer was waiting.
+                    }
+                },
+                null,
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(15));
+        }
+    }
+
+    private async Task ToggleNotificationsAsync()
+    {
+        showNotifications = !showNotifications;
+        if (showNotifications)
+        {
+            await LoadNotificationsAsync();
+        }
+    }
+
+    private async Task OpenNotificationAsync(Notification notification)
+    {
+        if (!notification.IsRead)
+        {
+            await NotificationService.MarkAsReadAsync(notification.Id);
+        }
+
+        showNotifications = false;
+        await LoadNotificationsAsync();
+        Navigation.NavigateTo(notification.CustomerOnboardingId is int onboardingId
+            ? $"onboarding/{onboardingId}"
+            : notification.ProjectId is int projectId ? $"projects/{projectId}"
+            : notification.ExistingCustomerId is int customerId ? $"existing-customers/{customerId}"
+            : $"ticket/{notification.TicketNumber}");
+    }
+
+    private async Task MarkAsReadAsync(Notification notification)
+    {
+        await NotificationService.MarkAsReadAsync(notification.Id);
+        await LoadNotificationsAsync();
+    }
+
+    private async Task MarkAllAsReadAsync()
+    {
+        await NotificationService.MarkAllAsReadAsync();
+        await LoadNotificationsAsync();
+    }
+
+    private async Task LoadNotificationsAsync()
+    {
+        notifications = await NotificationService.GetForCurrentUserAsync();
+        unreadNotificationCount = notifications.Count(notification => !notification.IsRead);
+    }
+
+    public void Dispose()
+    {
+        notificationRefreshTimer?.Dispose();
+    }
+}
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+

@@ -1,0 +1,40 @@
+@page "/testing/automation/builder"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using ServicePortal.Data
+@using ServicePortal.Services
+@attribute [Authorize(Policy = "AdministratorOnly")]
+@inject BrowserTestService BrowserTestService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageHeader Title="Browser Test Builder" Description="Create repeatable browser checks without writing code.">
+    <Actions><a class="btn btn-outline-primary" href="testing/automation/ecert"><i class="bi bi-arrow-left me-1"></i>Automated Testing</a></Actions>
+</PageHeader>
+
+@if (!string.IsNullOrWhiteSpace(message)) { <div class="alert alert-success">@message</div> }
+<div class="row g-4"><div class="col-xl-6"><div class="card"><div class="card-header"><strong><i class="bi bi-diagram-3 me-2"></i>New browser test</strong></div><div class="card-body">
+    <EditForm Model="model" OnValidSubmit="SaveAsync"><DataAnnotationsValidator /><ValidationSummary class="text-danger" />
+        <div class="row g-3"><div class="col-md-4"><label class="form-label">Product</label><InputSelect class="form-select" @bind-Value="model.Product"><option>eCERT</option><option>eGTA</option><option>UKCS Portal</option></InputSelect></div><div class="col-md-8"><label class="form-label">Test name</label><InputText class="form-control" @bind-Value="model.Name" /></div><div class="col-12"><label class="form-label">Starting URL</label><InputText class="form-control" @bind-Value="model.StartUrl" placeholder="https://…" /></div></div>
+        <hr /><div class="d-flex justify-content-between align-items-center mb-3"><strong>Steps</strong><button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddStep">Add step</button></div>
+        @foreach (var step in model.Steps)
+        { <div class="border rounded p-3 mb-3"><div class="row g-2"><div class="col-md-3"><label class="form-label small">Action</label><InputSelect class="form-select" @bind-Value="step.Action"><option>Click</option><option>Enter text</option><option>Check text</option><option>Wait</option></InputSelect></div><div class="col-md-5"><label class="form-label small">Target</label><InputText class="form-control" @bind-Value="step.Target" placeholder="CSS selector" /></div><div class="col-md-4"><label class="form-label small">Text / seconds</label><InputText class="form-control" @bind-Value="step.Value" /></div></div></div> }
+        <button class="btn btn-primary" type="submit">@(model.Id == 0 ? "Save browser test" : "Save changes")</button>
+        @if (model.Id != 0) { <button class="btn btn-outline-secondary ms-2" type="button" @onclick="CancelEdit">Cancel</button> }
+    </EditForm>
+</div></div></div>
+<div class="col-xl-6"><div class="card"><div class="card-header"><strong><i class="bi bi-list-check me-2"></i>Saved browser tests</strong></div><div class="list-group list-group-flush">@if (tests.Count == 0) { <div class="list-group-item text-muted">No browser tests have been created yet.</div> } @foreach (var test in tests) { <div class="list-group-item"><div class="d-flex justify-content-between gap-2"><div><strong>@test.Name</strong><div class="small text-muted">@test.Product · @test.Steps.Count step@(test.Steps.Count == 1 ? "" : "s")</div><div class="small text-muted text-truncate">@test.StartUrl</div></div><div class="btn-group"><button class="btn btn-sm btn-outline-primary" @onclick="() => BeginEdit(test)">Edit</button><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(test.Id)">Delete</button></div></div></div> }</div></div></div></div>
+
+@code {
+    private BrowserTest model = NewModel(); private List<BrowserTest> tests = []; private string message = string.Empty; private string userName = "Unknown";
+    protected override async Task OnInitializedAsync() { var auth = await AuthenticationStateProvider.GetAuthenticationStateAsync(); userName = auth.User.FindFirstValue(ClaimTypes.Name) ?? auth.User.Identity?.Name ?? "Unknown"; await LoadAsync(); }
+    private static BrowserTest NewModel() => new() { Product = "eCERT", Steps = [new BrowserTestStep { Action = "Click" }] };
+    private void AddStep() => model.Steps.Add(new BrowserTestStep { Action = "Click" });
+    private async Task SaveAsync() { var wasNew = model.Id == 0; await BrowserTestService.SaveAsync(model, userName); model = NewModel(); message = wasNew ? "Browser test saved." : "Browser test updated."; await LoadAsync(); }
+    private void BeginEdit(BrowserTest test) => model = new BrowserTest { Id = test.Id, Product = test.Product, Name = test.Name, StartUrl = test.StartUrl, Steps = test.Steps.OrderBy(step => step.SortOrder).Select(step => new BrowserTestStep { Action = step.Action, Target = step.Target, Value = step.Value }).ToList() };
+    private void CancelEdit() => model = NewModel();
+    private async Task DeleteAsync(int id) { await BrowserTestService.DeleteAsync(id); await LoadAsync(); }
+    private async Task LoadAsync() => tests = await BrowserTestService.GetTestsAsync();
+}
